@@ -113,7 +113,7 @@ const API = (() => {
         seen.add(n);
         correct.push(n - 1);
       }
-      if (!correct.length) errors.push(`Fila ${line}: la columna 'correctas' no tiene índices válidos (ej. 1;3;5).`);
+      if (!correct.length) errors.push(`Fila ${line}: la columna 'correctas' no tiene índices válidos (ej. 1;3;5). Todas las filas deben tener tantas celdas como el encabezado: si la pregunta usa menos de 8 opciones, dejá las celdas restantes vacías.`);
 
       questions.push({
         id: questions.length,

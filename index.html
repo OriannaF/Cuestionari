@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuestionario · CSV con repetición espaciada</title>
+  <meta name="description" content="Cuestionario de opción múltiple desde CSV para GitHub Pages, con repetición espaciada y puntaje parcial con penalización.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>Cuestionario</h1>
+      <span id="quiz-name" class="muted small"></span>
+    </div>
+  </header>
+
+  <main id="app" class="container"></main>
+
+  <footer class="muted small">
+    Progreso y preferencias guardados localmente en tu navegador · preguntas desde data/cuestionario.csv o subiendo un CSV
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/quiz.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      window.UI.init();
+    });
+  </script>
+</body>
+</html>
