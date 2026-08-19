@@ -88,7 +88,9 @@ pregunta,categoria,correctas,explicacion
 
 - **Sin feedback durante la sesión**: no se muestra cuál es la opción correcta hasta que finalizás todas las preguntas.
 - **Randomización en cada intento**: el orden de las preguntas y el de las opciones (con sus letras) se barajan con Fisher‑Yates cada vez que iniciás una sesión o la repetís.
-- **División en sesiones**: con muchos temas la sesión se arma con el tamaño que elijas (15, 20, 25, 30, 40, 50 o todas). Las sesiones priorizan lo que tenés más flojo.
+- **División en sesiones**: elegís el **tipo de sesión** (Para hoy / Aleatorias / Solo nuevas / Solo falladas / Todas) y un **tope por sesión** (15, 20, 25, 30, 40, 50 o sin tope). "Para hoy" toma las nunca vistas más las vencidas, ordenadas de más débiles a más fuertes.
+- **Espaciado inteligente**: al planificar un repaso, si el día destino ya tiene muchas tarjetas el algoritmo lo corre al día siguiente con espacio, para que la carga diaria quede pareja (≈ 1 tarjeta cada 30).
+- **Fecha del parcial**: podés fijar una fecha límite en el inicio; las tarjetas nunca se planifican después de esa fecha (los intervalos se recortan a los días restantes) y el inicio te muestra cuántos días faltan (en rojo si faltan 3 o menos).
 - **Puntaje con penalización** (puntos por pregunta, por defecto 1): si la pregunta tiene `c` respuestas correctas, cada correcta marcada suma `1/c` puntos y cada incorrecta marcada resta `1/c`. Las correctas que no marcas no suman ni restan. El puntaje de una pregunta puede ser negativo si marcás más incorrectas que correctas.
   - Ejemplo: pregunta de 1 punto con 4 correctas, marcás 3 bien y 1 mal → `3/4 − 1/4 = 0,5` puntos.
 - **Algoritmo de repetición espaciada (SM‑2 simplificado)**: cada pregunta guarda en tu navegador (localStorage) su facilidad, intervalo, próxima fecha, intentos y fallos.
@@ -112,7 +114,7 @@ pregunta,categoria,correctas,explicacion
 ```
 ├── index.html            # página única
 ├── css/style.css
-├── js/csv.js             # parser CSV y validación (máx. 200 preguntas, 8 opciones)
+├── js/csv.js             # parser CSV y validación (máx. 1000 preguntas, 8 opciones)
 ├── js/scheduler.js       # repetición espaciada + barajar (Fisher-Yates)
 ├── js/quiz.js            # sesiones, puntaje con penalización, persistencia
 ├── js/storage.js         # localStorage (progreso y último CSV cargado)

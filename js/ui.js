@@ -4,6 +4,7 @@
   const Quiz = window.Quiz;
   const S = () => Quiz.S;
   const $ = (sel) => document.querySelector(sel);
+  let warningsDismissed = false;
 
   const esc = (v) => String(v == null ? "" : v)
     .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -30,9 +31,20 @@
       document.body.appendChild(el);
     }
     el.textContent = msg;
+    let close = el.querySelector(".toast-close");
+    if (!close) {
+      close = document.createElement("button");
+      close.className = "toast-close";
+      close.addEventListener("click", () => {
+        el.classList.remove("show");
+        clearTimeout(el._t);
+      });
+    }
+    close.textContent = "✕";
+    el.appendChild(close);
     el.classList.add("show");
     clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove("show"), 2600);
+    el._t = setTimeout(() => el.classList.remove("show"), 3200);
   }
 
   const BUNDLED_NAME = "Final ADS";
@@ -55,6 +67,7 @@
   function init() {
     loadSource().then((r) => {
       if (r === true) {
+        warningsDismissed = false;
         renderHome();
         toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
       } else if (r && r.errors) {
@@ -74,6 +87,7 @@
     reader.onload = () => {
       const res = Quiz.loadCsv(String(reader.result), file.name);
       if (res.ok) {
+        warningsDismissed = false;
         renderHome();
         toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
       } else {
@@ -138,6 +152,12 @@
     const draft = S().items.length > 0 && !S().results;
     const failedN = Quiz.failedCount();
     const pts = st.points;
+    const mode = S().settings.mode;
+    const todayN = Quiz.todayCount();
+    const newN = Quiz.newCount();
+    const ed = S().settings.examDate;
+    const examLeft = ed ? Math.round((new Date(ed + "T00:00:00") - new Date(new Date().toDateString())) / 86400000) : null;
+    const examUrgent = examLeft != null && examLeft <= 3;
 
     document.getElementById("quiz-name").textContent = `${S().name} · ${S().hash}`;
 
@@ -146,15 +166,40 @@
       return `<tr><td>${esc(name)}</td><td>${c.count}</td><td>${c.failed}</td><td>${acc === null ? "—" : acc + " %"}</td></tr>`;
     }).join("");
 
+    const fmtDate = (iso) => {
+      const [y, m, d] = iso.split("-");
+      return `${d}/${m}`;
+    };
+    const modeOptions = [
+      ["today", `Para hoy (${todayN})`],
+      ["random", `Aleatorias (${st.total})`],
+      ["new", `Solo nuevas (${newN})`],
+      ["failed", `Solo falladas (${failedN})`],
+      ["all", `Todas (${st.total})`]
+    ].map(([v, lbl]) => `<option value="${v}" ${mode === v ? "selected" : ""}>${lbl}</option>`).join("");
+
     view(`
+      <div class="card hero">
+        <div class="hero-today">
+          <div class="hero-num">${todayN}</div>
+          <div class="hero-lbl">para hoy <span class="muted small">(${st.total} en total)</span></div>
+        </div>
+        <div class="hero-mid">
+          <div class="hero-title">Plan del día</div>
+          <div class="muted small">${newN} nuevas · ${Math.max(0, todayN - newN)} repasos vencidos</div>
+          ${ed ? `<div class="chip ${examUrgent ? "warn" : ""} exam-chip">Parcial: ${fmtDate(ed)} · ${examLeft === 0 ? "¡HOY!" : `faltan ${examLeft} día${examLeft === 1 ? "" : "s"}`}</div>` : ""}
+        </div>
+        <div class="hero-btn">
+          <button class="btn primary big" id="btn-start">Empezar sesión de hoy</button>
+        </div>
+      </div>
       <div class="card">
         <div class="grid-stats">
           ${stat("", st.total, "Preguntas")}
-          ${stat("due", st.unseen + st.due, "Pendientes")}
+          ${stat("due", todayN, "Para hoy")}
           ${stat("ok", st.mastered, "Dominadas")}
-          ${stat("bad", st.failed, "Falladas")}
+          ${stat("bad", st.failed, "Falladas históricas")}
         </div>
-        <p class="muted small">Las pendientes son las nunca vistas más las que el algoritmo de repetición espaciada manda repasar hoy.</p>
       </div>
       ${draft ? `
         <div class="card accent-card">
@@ -164,16 +209,22 @@
             <button class="btn" id="btn-discard">Descartar</button>
           </div>
         </div>` : ""}
-      ${S().warnings.length ? `
-        <div class="card warn-card">
-          <h2>Filas omitidas (${S().warnings.length})</h2>
+      ${S().warnings.length && !warningsDismissed ? `
+        <div class="card warn-card" id="warn-card">
+          <div class="card-head">
+            <h2>Filas omitidas (${S().warnings.length})</h2>
+            <button class="btn icon" id="btn-warn-close" title="Cerrar aviso">✕</button>
+          </div>
           <p class="muted small">Se cargaron las preguntas válidas. Estas filas se ignoraron:</p>
           <div class="error-list">${S().warnings.map((w) => `<div class="error-item">${esc(w)}</div>`).join("")}</div>
         </div>` : ""}
       <div class="card">
         <h2>Nueva sesión</h2>
         <div class="controls">
-          <label>Preguntas por sesión
+          <label>Tipo de sesión
+            <select class="input" id="sel-mode">${modeOptions}</select>
+          </label>
+          <label>Tope por sesión
             <select class="input" id="sel-size">
               ${[15, 20, 25, 30, 40, 50, 0].map((n) =>
                 `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n}</option>`).join("")}
@@ -183,9 +234,14 @@
             <input class="input" id="inp-points" type="number" min="0.25" step="0.25" value="${pts}">
           </label>
         </div>
+        <div class="controls">
+          <label>Fecha del parcial (opcional)
+            <input class="input" id="inp-exam" type="date" value="${ed}">
+          </label>
+          <span class="muted small">Las tarjetas no se planifican después de esta fecha.</span>
+        </div>
         <div class="btn-row">
-          <button class="btn primary" id="btn-start">Empezar sesión</button>
-          <button class="btn" id="btn-fail" ${failedN ? "" : "disabled"}>Repetir solo falladas ${failedN ? `(${failedN})` : ""}</button>
+          <button class="btn primary" id="btn-start2">Empezar sesión</button>
         </div>
       </div>
       <div class="card">
@@ -208,10 +264,12 @@
     `);
 
     bindUpload("dropzone2", "file2");
-    document.getElementById("btn-start").addEventListener("click", () => { Quiz.newSession(); renderQuiz(); });
-    document.getElementById("btn-fail").addEventListener("click", () => { Quiz.failedSession(); renderQuiz(); });
+    document.getElementById("btn-start").addEventListener("click", () => { Quiz.setMode("today"); Quiz.newSession(); renderQuiz(); });
+    document.getElementById("btn-start2").addEventListener("click", () => { Quiz.newSession(); renderQuiz(); });
+    document.getElementById("sel-mode").addEventListener("change", (e) => { Quiz.setMode(e.target.value); renderHome(); });
     document.getElementById("sel-size").addEventListener("change", (e) => Quiz.setSize(e.target.value));
     document.getElementById("inp-points").addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
+    document.getElementById("inp-exam").addEventListener("change", (e) => { Quiz.setExamDate(e.target.value); renderHome(); });
     document.getElementById("btn-reset").addEventListener("click", () => {
       if (confirm("¿Reiniciar todo el progreso de este cuestionario?")) {
         Quiz.resetProgress();
@@ -219,6 +277,8 @@
         toast("Progreso reiniciado");
       }
     });
+    const warnClose = document.getElementById("btn-warn-close");
+    if (warnClose) warnClose.addEventListener("click", () => { warningsDismissed = true; renderHome(); });
     const resumeBtn = document.getElementById("btn-resume");
     if (resumeBtn) resumeBtn.addEventListener("click", () => {
       if (Quiz.tryResume()) renderQuiz();
