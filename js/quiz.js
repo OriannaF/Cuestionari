@@ -24,7 +24,7 @@ const Quiz = (() => {
     const unit = 1 / c;
     let s = 0;
     for (const i of checkedOrig) s += q.correct.indexOf(i) >= 0 ? unit : -unit;
-    return Math.max(0, Math.round(s * 100000) / 100000);
+    return Math.round(s * 100000) / 100000;
   }
 
   function loadSettings() {

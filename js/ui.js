@@ -296,7 +296,7 @@
       <div class="sticky">
         <button class="btn" id="btn-exit">Salir</button>
         <span class="muted" id="pending-label">${n - answered} sin responder</span>
-        <button class="btn primary" id="btn-submit" ${answered === n ? "" : "disabled"}>Finalizar y ver puntaje</button>
+        <button class="btn primary" id="btn-submit">Finalizar y ver puntaje</button>
       </div>
     `);
     bindQuizEvents();
@@ -308,7 +308,6 @@
     $("#bar").style.width = Math.round((answered / n) * 100) + "%";
     $("#cnt-answered").textContent = answered;
     $("#pending-label").textContent = `${n - answered} sin responder`;
-    $("#btn-submit").disabled = answered !== n;
   }
 
   function bindQuizEvents() {
@@ -337,7 +336,6 @@
   }
 
   function submitQuiz() {
-    if (Quiz.answeredCount() < S().items.length) return;
     const res = Quiz.submit();
     document.body.classList.remove("quiz-open");
     renderResults(res);

@@ -38,14 +38,14 @@ Reglas y tolerancias:
 - **Sin feedback durante la sesión**: no se muestra cuál es la opción correcta hasta que finalizás todas las preguntas.
 - **Randomización en cada intento**: el orden de las preguntas y el de las opciones (con sus letras) se barajan con Fisher‑Yates cada vez que iniciás una sesión o la repetís.
 - **División en sesiones**: con muchos temas la sesión se arma con el tamaño que elijas (15, 20, 25, 30, 40, 50 o todas). Las sesiones priorizan lo que tenés más flojo.
-- **Puntaje con penalización** (puntos por pregunta, por defecto 1): si la pregunta tiene `c` respuestas correctas, cada correcta marcada suma `1/c` puntos y cada incorrecta marcada resta `1/c`. Las correctas que no marcas no suman ni restan. El mínimo por pregunta es 0.
+- **Puntaje con penalización** (puntos por pregunta, por defecto 1): si la pregunta tiene `c` respuestas correctas, cada correcta marcada suma `1/c` puntos y cada incorrecta marcada resta `1/c`. Las correctas que no marcas no suman ni restan. El puntaje de una pregunta puede ser negativo si marcás más incorrectas que correctas.
   - Ejemplo: pregunta de 1 punto con 4 correctas, marcás 3 bien y 1 mal → `3/4 − 1/4 = 0,5` puntos.
 - **Algoritmo de repetición espaciada (SM‑2 simplificado)**: cada pregunta guarda en tu navegador (localStorage) su facilidad, intervalo, próxima fecha, intentos y fallos.
   - Respuesta perfecta → el intervalo crece (1, 2, 4, 8… días, hasta 90, ajustado por la facilidad).
   - Parcial o incorrecta → se resetea y vuelve a aparecer al día siguiente.
   - La sesión toma primero las nunca vistas y las vencidas (ordenadas de más débiles a más fuertes) y completa con el resto.
   - Por eso conviene estudiar un poco todos los días: el algoritmo te hace repasar justo lo que estás por olvidar.
-- **Resultados**: puntaje total (y porcentaje) al finalizar, desglose pregunta por pregunta con tus marcas vs. las correctas, y explicaciones. Botones para repetir las mismas preguntas, repetir solo las falladas o empezar otra sesión.
+- **Resultados**: puntaje total (y porcentaje) al finalizar, desglose pregunta por pregunta con tus marcas vs. las correctas, y explicaciones. Podés finalizar aunque queden preguntas sin responder (las sin responder valen 0 y cuentan como falladas). Botones para repetir las mismas preguntas, repetir solo las falladas o empezar otra sesión.
 - **Estadísticas**: pendientes, dominadas, falladas y desempeño por categoría.
 
 ## Progreso guardado
