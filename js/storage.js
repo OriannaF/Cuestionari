@@ -1,6 +1,7 @@
 "use strict";
 
-const API = (() => {
+(function () {
+const QuizStore = (() => {
   const mem = {};
   const store = typeof localStorage !== "undefined" ? localStorage : {
     getItem: (k) => (k in mem ? mem[k] : null),
@@ -48,5 +49,6 @@ const API = (() => {
   };
 })();
 
-if (typeof window !== "undefined") window.QuizStore = API;
-if (typeof module !== "undefined" && module.exports) module.exports = API;
+if (typeof window !== "undefined") window.QuizStore = QuizStore;
+if (typeof module !== "undefined" && module.exports) module.exports = QuizStore;
+})();

@@ -1,5 +1,6 @@
 "use strict";
 
+(function () {
 const hasWindow = typeof window !== "undefined";
 const CSV = hasWindow ? window.CSV : require("./csv.js");
 const Sched = hasWindow ? window.Scheduler : require("./scheduler.js");
@@ -192,3 +193,4 @@ const Quiz = (() => {
 
 if (hasWindow) window.Quiz = Quiz;
 if (typeof module !== "undefined" && module.exports) module.exports = Quiz;
+})();

@@ -1,6 +1,7 @@
 "use strict";
 
-const API = (() => {
+(function () {
+const Scheduler = (() => {
   const startOfDay = () => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -97,5 +98,6 @@ const API = (() => {
   };
 })();
 
-if (typeof window !== "undefined") window.Scheduler = API;
-if (typeof module !== "undefined" && module.exports) module.exports = API;
+if (typeof window !== "undefined") window.Scheduler = Scheduler;
+if (typeof module !== "undefined" && module.exports) module.exports = Scheduler;
+})();

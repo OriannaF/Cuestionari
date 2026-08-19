@@ -1,6 +1,7 @@
 "use strict";
 
-const API = (() => {
+(function () {
+const CSV = (() => {
   const MAX = 200;
 
   function detectDelimiter(line) {
@@ -131,5 +132,6 @@ const API = (() => {
   return { parseCSV, parseQuestions, MAX };
 })();
 
-if (typeof window !== "undefined") window.CSV = API;
-if (typeof module !== "undefined" && module.exports) module.exports = API;
+if (typeof window !== "undefined") window.CSV = CSV;
+if (typeof module !== "undefined" && module.exports) module.exports = CSV;
+})();
