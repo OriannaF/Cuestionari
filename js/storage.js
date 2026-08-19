@@ -46,10 +46,13 @@ const QuizStore = (() => {
   function loadLastCsv() { return get("quiz.csv.last", null); }
   function saveLastCsv(v) { set("quiz.csv.last", v); }
 
+  function loadExamDates(h) { return get("quiz.examdates." + h, null); }
+  function saveExamDates(h, d) { set("quiz.examdates." + h, d); }
+
   return {
     hash, loadProgress, saveProgress, resetProgress,
     loadSettings, saveSettings, loadDraft, saveDraft, clearDraft,
-    loadLastCsv, saveLastCsv
+    loadLastCsv, saveLastCsv, loadExamDates, saveExamDates
   };
 })();
 

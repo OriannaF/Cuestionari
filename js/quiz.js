@@ -53,9 +53,42 @@ const Quiz = (() => {
     S.settings.points = isNaN(pts) ? 1 : Math.max(0.05, pts);
     const modes = ["today", "random", "new", "failed", "all"];
     S.settings.mode = modes.includes(saved.mode) ? saved.mode : "today";
-    const ed = String(saved.examDate || "").trim();
-    S.settings.examDate = /^\d{4}-\d{2}-\d{2}$/.test(ed) && !isNaN(new Date(ed + "T00:00:00").getTime()) ? ed : "";
   }
+
+  const validDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00").getTime()) ? v : "";
+
+  function loadExamDates() {
+    const saved = Store.loadExamDates(S.hash);
+    const ex = saved && typeof saved === "object" ? saved : {};
+    S.examDates = {
+      date: validDate(ex.date),
+      cats: (ex.cats && typeof ex.cats === "object") ? ex.cats : {}
+    };
+    for (const k of Object.keys(S.examDates.cats)) {
+      if (!validDate(S.examDates.cats[k])) delete S.examDates.cats[k];
+    }
+    const old = validDate(String((Store.loadSettings() || {}).examDate || ""));
+    if (old && !S.examDates.date) {
+      S.examDates.date = old;
+      saveExamDates();
+      Store.saveSettings({
+        sessionSize: S.settings.size,
+        points: S.settings.points,
+        mode: S.settings.mode
+      });
+    }
+  }
+
+  function saveExamDates() {
+    Store.saveExamDates(S.hash, S.examDates);
+  }
+
+  const quizDate = () => S.examDates.date || "";
+  const catDate = (cat) => {
+    const c = S.examDates.cats[cat];
+    if (c) return c;
+    return quizDate();
+  };
 
   function loadCsv(text, name) {
     const res = CSV.parseQuestions(text);
@@ -70,6 +103,7 @@ const Quiz = (() => {
     S.answers = {};
     S.results = null;
     loadSettings();
+    loadExamDates();
     Store.saveLastCsv({ text, name });
     return res;
   }
@@ -86,8 +120,7 @@ const Quiz = (() => {
     Store.saveSettings({
       sessionSize: S.settings.size,
       points: S.settings.points,
-      mode: S.settings.mode,
-      examDate: S.settings.examDate
+      mode: S.settings.mode
     });
   }
 
@@ -103,9 +136,16 @@ const Quiz = (() => {
   }
 
   function setExamDate(iso) {
-    const v = String(iso || "").trim();
-    S.settings.examDate = /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00").getTime()) ? v : "";
-    persistSettings();
+    S.examDates.date = validDate(iso);
+    saveExamDates();
+  }
+
+  function setCatExamDate(cat, iso) {
+    const c = String(cat || "").trim() || "Sin categoría";
+    const v = validDate(iso);
+    if (v) S.examDates.cats[c] = v;
+    else delete S.examDates.cats[c];
+    saveExamDates();
   }
 
   function setPoints(p) {
@@ -168,15 +208,16 @@ const Quiz = (() => {
     const marked = { correct: [], partial: [], failed: [] };
     let total = 0;
     const cap = Math.max(4, Math.round(S.questions.length / 30));
-    const schedCtx = { progress: S.progress, examDate: S.settings.examDate, cap };
+    const schedCtx = { progress: S.progress };
     const detail = S.items.map((it) => {
       const q = it.q;
       const card = S.progress[q.id] || Sched.newCard();
+      const qCtx = Object.assign({ qid: q.id, examDate: catDate(q.category), cap }, schedCtx);
       if (q.type === "dropdown") {
         const chosen = S.answers[q.id] || {};
         const score = scoreDropdown(q, chosen);
         const full = score + 1e-9 >= pts;
-        S.progress[q.id] = Sched.update(card, score, full, Object.assign({ qid: q.id }, schedCtx));
+        S.progress[q.id] = Sched.update(card, score, full, qCtx);
         total += score;
         const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
         marked[state].push(q.id);
@@ -186,7 +227,7 @@ const Quiz = (() => {
         const answer = typeof S.answers[q.id] === "string" ? S.answers[q.id] : "";
         const score = scoreFill(q, answer);
         const full = score + 1e-9 >= pts;
-        S.progress[q.id] = Sched.update(card, score, full, Object.assign({ qid: q.id }, schedCtx));
+        S.progress[q.id] = Sched.update(card, score, full, qCtx);
         total += score;
         const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
         marked[state].push(q.id);
@@ -196,7 +237,7 @@ const Quiz = (() => {
       const origChecked = dispChecked.map((d) => it.optOrder[d]);
       const score = scoreQuestion(q, origChecked);
       const full = score + 1e-9 >= pts;
-      S.progress[q.id] = Sched.update(card, score, full, Object.assign({ qid: q.id }, schedCtx));
+      S.progress[q.id] = Sched.update(card, score, full, qCtx);
       total += score;
       const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
       marked[state].push(q.id);
@@ -286,11 +327,27 @@ const Quiz = (() => {
     return { total: S.questions.length, unseen, due, mastered, failed, cats, points: pts };
   }
 
+  function scheduledByDay() {
+    const by = {};
+    for (const [id, c] of Object.entries(S.progress)) {
+      if (c && c.due) {
+        const k = String(c.due).slice(0, 10);
+        (by[k] = by[k] || []).push(parseInt(id, 10));
+      }
+    }
+    return by;
+  }
+
+  function questionsOnDay(iso) {
+    const ids = scheduledByDay()[String(iso).slice(0, 10)] || [];
+    return ids.map((id) => S.questions[id]).filter(Boolean);
+  }
+
   return {
     S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle, setSlot, setFill,
     isAnswered, answeredCount, submit, tryResume, resetProgress,
-    persistSettings, setSize, setPoints, setMode, setExamDate,
-    stats, failedCount, todayCount, newCount, scoreQuestion
+    persistSettings, setSize, setPoints, setMode, setExamDate, setCatExamDate, quizDate, catDate,
+    stats, failedCount, todayCount, newCount, scheduledByDay, questionsOnDay, scoreQuestion
   };
 })();
 

@@ -155,9 +155,22 @@
     const mode = S().settings.mode;
     const todayN = Quiz.todayCount();
     const newN = Quiz.newCount();
-    const ed = S().settings.examDate;
-    const examLeft = ed ? Math.round((new Date(ed + "T00:00:00") - new Date(new Date().toDateString())) / 86400000) : null;
-    const examUrgent = examLeft != null && examLeft <= 3;
+    const ed = Quiz.quizDate();
+    const cats = [...new Set(S().questions.map((q) => q.category || "Sin categoría"))];
+    homeCats = cats;
+    const dateList = [];
+    if (ed) dateList.push({ name: "Cuestionario", iso: ed });
+    cats.forEach((c) => {
+      const iso = Quiz.catDate(c);
+      if (iso) dateList.push({ name: c, iso });
+    });
+    const todayMid = new Date();
+    todayMid.setHours(0, 0, 0, 0);
+    const TODAY = todayMid.toISOString().slice(0, 10);
+    const upcoming = dateList
+      .map((d) => ({ ...d, left: Math.round((new Date(d.iso + "T00:00:00") - todayMid) / 86400000) }))
+      .filter((d) => d.left >= 0)
+      .sort((a, b) => a.left - b.left)[0];
 
     document.getElementById("quiz-name").textContent = `${S().name} · ${S().hash}`;
 
@@ -178,6 +191,19 @@
       ["all", `Todas (${st.total})`]
     ].map(([v, lbl]) => `<option value="${v}" ${mode === v ? "selected" : ""}>${lbl}</option>`).join("");
 
+    const examChip = upcoming
+      ? `<div class="chip ${upcoming.left <= 3 ? "warn" : ""} exam-chip" title="${esc(upcoming.name)}">Parcial: ${upcoming.name === "Cuestionario" ? "" : esc(upcoming.name) + " "}${fmtDate(upcoming.iso)} · ${upcoming.left === 0 ? "¡HOY!" : `faltan ${upcoming.left} día${upcoming.left === 1 ? "" : "s"}`}</div>`
+      : "";
+
+    const catDateInputs = cats.map((c, i) => {
+      const iso = Quiz.catDate(c);
+      return `<div class="cat-date-row">
+        <span class="cat-date-name">${esc(c)}</span>
+        <input class="input cat-date-input" id="inp-cat-exam-${i}" type="date" data-cat="${esc(c)}" value="${iso}" ${iso ? "" : 'style="color:var(--muted)"'}>
+        <button class="btn icon" data-clear="${esc(c)}" title="Quitar fecha del tema">✕</button>
+      </div>`;
+    }).join("");
+
     view(`
       <div class="card hero">
         <div class="hero-today">
@@ -187,7 +213,7 @@
         <div class="hero-mid">
           <div class="hero-title">Plan del día</div>
           <div class="muted small">${newN} nuevas · ${Math.max(0, todayN - newN)} repasos vencidos</div>
-          ${ed ? `<div class="chip ${examUrgent ? "warn" : ""} exam-chip">Parcial: ${fmtDate(ed)} · ${examLeft === 0 ? "¡HOY!" : `faltan ${examLeft} día${examLeft === 1 ? "" : "s"}`}</div>` : ""}
+          ${examChip}
         </div>
         <div class="hero-btn">
           <button class="btn primary big" id="btn-start">Empezar sesión de hoy</button>
@@ -219,6 +245,29 @@
           <div class="error-list">${S().warnings.map((w) => `<div class="error-item">${esc(w)}</div>`).join("")}</div>
         </div>` : ""}
       <div class="card">
+        <h2>Fechas de parcial</h2>
+        <div class="controls">
+          <label>Cuestionario
+            <input class="input" id="inp-exam" type="date" value="${ed}">
+          </label>
+          <span class="muted small">Las tarjetas no se planifican después de estas fechas. Cada tema puede tener su propia fecha; si no tiene, usa la del cuestionario.</span>
+        </div>
+        ${catDateInputs ? `<div class="cat-date-list">${catDateInputs}</div>` : ""}
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Calendario de repasos</h2>
+          <div class="cal-nav">
+            <button class="btn icon" id="cal-prev" title="Mes anterior">‹</button>
+            <span class="cal-label" id="cal-label">${calLabel()}</span>
+            <button class="btn icon" id="cal-next" title="Mes siguiente">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="muted small" id="cal-hint">Hacé clic en un día para ver las preguntas planificadas.</div>
+        <div class="cal-list" id="cal-list"></div>
+      </div>
+      <div class="card">
         <h2>Nueva sesión</h2>
         <div class="controls">
           <label>Tipo de sesión
@@ -233,12 +282,6 @@
           <label>Puntos por pregunta
             <input class="input" id="inp-points" type="number" min="0.25" step="0.25" value="${pts}">
           </label>
-        </div>
-        <div class="controls">
-          <label>Fecha del parcial (opcional)
-            <input class="input" id="inp-exam" type="date" value="${ed}">
-          </label>
-          <span class="muted small">Las tarjetas no se planifican después de esta fecha.</span>
         </div>
         <div class="btn-row">
           <button class="btn primary" id="btn-start2">Empezar sesión</button>
@@ -270,6 +313,13 @@
     document.getElementById("sel-size").addEventListener("change", (e) => Quiz.setSize(e.target.value));
     document.getElementById("inp-points").addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
     document.getElementById("inp-exam").addEventListener("change", (e) => { Quiz.setExamDate(e.target.value); renderHome(); });
+    document.querySelectorAll(".cat-date-input").forEach((inp) => {
+      inp.addEventListener("change", (e) => { Quiz.setCatExamDate(e.target.dataset.cat, e.target.value); renderHome(); });
+    });
+    document.querySelectorAll("[data-clear]").forEach((btn) => {
+      btn.addEventListener("click", () => { Quiz.setCatExamDate(btn.dataset.clear, ""); renderHome(); });
+    });
+    bindCalendar();
     document.getElementById("btn-reset").addEventListener("click", () => {
       if (confirm("¿Reiniciar todo el progreso de este cuestionario?")) {
         Quiz.resetProgress();
@@ -286,6 +336,109 @@
     });
     const discardBtn = document.getElementById("btn-discard");
     if (discardBtn) discardBtn.addEventListener("click", () => { S().items = []; S().results = null; renderHome(); });
+  }
+
+  let calYear = 0, calMonth = -1;
+  let homeCats = [];
+  const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const DAY_LETTERS = ["L", "M", "X", "J", "V", "S", "D"];
+  const isoOf = (y, m, d) => new Date(y, m, d, 12).toISOString().slice(0, 10);
+  const fmtIso = (iso) => {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}`;
+  };
+
+  function calNow() {
+    if (calYear === 0) {
+      const t = new Date();
+      calYear = t.getFullYear();
+      calMonth = t.getMonth();
+    }
+  }
+
+  const calLabel = () => { calNow(); return `${MONTHS[calMonth]} ${calYear}`; };
+
+  function examDaysOf() {
+    const m = {};
+    const qd = Quiz.quizDate();
+    if (qd) m[qd] = "Cuestionario";
+    for (const c of homeCats) {
+      const iso = Quiz.catDate(c);
+      if (iso) m[iso] = c;
+    }
+    return m;
+  }
+
+  function renderCal() {
+    calNow();
+    const grid = document.getElementById("cal-grid");
+    const label = document.getElementById("cal-label");
+    if (!grid) return;
+    if (label) label.textContent = calLabel();
+    const by = Quiz.scheduledByDay();
+    const examDays = examDaysOf();
+    const first = new Date(calYear, calMonth, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const nw = new Date();
+    const todayIso = isoOf(nw.getFullYear(), nw.getMonth(), nw.getDate());
+    let cells = DAY_LETTERS.map((l) => `<div class="cal-head">${l}</div>`).join("");
+    for (let i = 0; i < offset; i++) cells += `<div class="cal-day empty"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = isoOf(calYear, calMonth, d);
+      const n = (by[iso] || []).length;
+      const exam = examDays[iso];
+      const cls = [iso === todayIso ? "today" : "", n ? "has-plan" : "", exam ? "cal-exam" : ""].join(" ");
+      cells += `<div class="cal-day ${cls}" data-iso="${iso}" ${n ? `title="${n} pregunta${n === 1 ? "" : "s"}"` : ""}>
+        <span class="cal-day-num">${d}</span>
+        ${n ? `<span class="cal-pill">${n}</span>` : ""}
+        ${exam ? `<span class="cal-dot" title="Parcial: ${esc(exam)}"></span>` : ""}
+      </div>`;
+    }
+    grid.innerHTML = cells;
+    grid.querySelectorAll(".cal-day.has-plan").forEach((cell) => {
+      cell.addEventListener("click", () => showCalDay(cell.dataset.iso, cell));
+    });
+  }
+
+  function showCalDay(iso, cell) {
+    const list = document.getElementById("cal-list");
+    document.querySelectorAll(".cal-day.selected").forEach((c) => c.classList.remove("selected"));
+    if (!list) return;
+    if (!iso) { list.innerHTML = ""; return; }
+    if (cell) cell.classList.add("selected");
+    const qs = Quiz.questionsOnDay(iso);
+    const exam = examDaysOf()[iso];
+    list.innerHTML = `
+      <div class="cal-list-title">${fmtIso(iso)}${exam ? ` · Parcial: ${esc(exam)}` : ""} — ${qs.length} pregunta${qs.length === 1 ? "" : "s"}</div>
+      ${qs.length ? qs.map((q, i) => `
+        <div class="cal-list-item">
+          <span class="cal-item-num">${i + 1}</span>
+          <span class="cal-item-text">${esc(q.text)}</span>
+          ${q.category ? `<span class="chip">${esc(q.category)}</span>` : ""}
+        </div>`).join("")
+        : `<div class="muted small">Sin preguntas planificadas para ese día.</div>`}`;
+  }
+
+  function bindCalendar() {
+    const prev = document.getElementById("cal-prev");
+    const next = document.getElementById("cal-next");
+    if (!prev) return;
+    prev.addEventListener("click", () => {
+      calNow();
+      calMonth--;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCal();
+      showCalDay(null, null);
+    });
+    next.addEventListener("click", () => {
+      calNow();
+      calMonth++;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      renderCal();
+      showCalDay(null, null);
+    });
+    renderCal();
   }
 
   function renderQuiz() {
