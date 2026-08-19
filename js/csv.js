@@ -2,7 +2,13 @@
 
 (function () {
 const CSV = (() => {
-  const MAX = 200;
+  const MAX = 1000;
+
+  const normText = (t) => String(t || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   function detectDelimiter(line) {
     let best = ",";
@@ -88,6 +94,13 @@ const CSV = (() => {
     if (ci === -1) ci = header.length - 1;
     if (ci <= qi) return { ok: false, errors: ["La columna 'correctas' debe estar después de la columna de la pregunta."] };
     if (data.length > MAX) return { ok: false, errors: [`El archivo tiene ${data.length} preguntas y el máximo permitido es ${MAX} (revisá el CSV o dividilo).`] };
+    let hasOptCols = false;
+    for (let c = qi + 1; c < ci && c < header.length; c++) {
+      if (c === cati || c === expi || c === oi) continue;
+      hasOptCols = true;
+      break;
+    }
+    const isFill = !isDropdown && !hasOptCols;
 
     const questions = [];
     const warnings = [];
@@ -141,9 +154,35 @@ const CSV = (() => {
         }
       }
 
+      if (isFill) {
+        const raw = String(row[ci] || "").trim();
+        const accepted = raw ? raw.split(/[;|]/).map((t) => t.trim()).filter(Boolean) : [];
+        const seen = new Set();
+        const clean = accepted.filter((t) => {
+          const n = normText(t);
+          if (!n || seen.has(n)) return false;
+          seen.add(n);
+          return true;
+        });
+        if (!clean.length) {
+          warnings.push(`Fila ${line}: la columna 'correctas' necesita al menos una respuesta correcta como texto. Se omitió.`);
+          continue;
+        }
+        questions.push({
+          id: questions.length,
+          type: "fill",
+          text: textQ,
+          options: [],
+          correct: clean,
+          category: String(cati >= 0 ? row[cati] || "" : "").trim(),
+          explanation: String(expi >= 0 ? row[expi] || "" : "").trim()
+        });
+        continue;
+      }
+
       const options = [];
       for (let c = qi + 1; c < ci && c < row.length; c++) {
-        if (c === cati || c === expi) continue;
+        if (c === cati || c === expi || c === oi) continue;
         const v = String(row[c] || "").trim();
         if (v) options.push(v);
       }
@@ -186,7 +225,7 @@ const CSV = (() => {
     return { ok: true, questions, warnings: [] };
   }
 
-  return { parseCSV, parseQuestions, MAX };
+  return { parseCSV, parseQuestions, MAX, normText };
 })();
 
 if (typeof window !== "undefined") window.CSV = CSV;

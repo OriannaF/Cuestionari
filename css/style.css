@@ -279,6 +279,8 @@ h2 { font-size: 16px; margin: 0 0 12px; }
 }
 .slot-select { flex: 1; min-width: 0; }
 
+.fill-input { max-width: 520px; width: 100%; }
+
 .opt.checked { border-color: var(--accent); background: rgba(77, 159, 255, 0.1); }
 .opt.checked .alpha { background: var(--accent); color: #fff; border-color: var(--accent); }
 

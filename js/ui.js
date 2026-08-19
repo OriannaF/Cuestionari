@@ -109,7 +109,7 @@
         <p class="muted">Subí un archivo CSV con las preguntas. Cada pregunta admite hasta 8 opciones y varias respuestas correctas.</p>
         <div class="dropzone" id="dropzone">
           <div class="dz-title">Arrastrá el CSV acá o hacé clic para elegirlo</div>
-          <div class="muted small">Máximo 200 preguntas · una fila por pregunta · delimitador , o ; (se detecta solo)</div>
+          <div class="muted small">Máximo 1000 preguntas · una fila por pregunta · delimitador , o ; (se detecta solo)</div>
         </div>
         <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>
       </div>
@@ -176,7 +176,7 @@
           <label>Preguntas por sesión
             <select class="input" id="sel-size">
               ${[15, 20, 25, 30, 40, 50, 0].map((n) =>
-                `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(200, st.total)})` : n}</option>`).join("")}
+                `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n}</option>`).join("")}
             </select>
           </label>
           <label>Puntos por pregunta
@@ -251,7 +251,13 @@
           </label>`).join("");
           return `<div class="qtext">${rich(q.text)}</div><div class="slot-grid">${rows}</div>`;
         })()
-        : (() => {
+        : q.type === "fill"
+          ? (() => {
+            const val = typeof S().answers[q.id] === "string" ? S().answers[q.id] : "";
+            return `<div class="qtext">${rich(q.text)}</div>
+              <input class="input fill-input" data-q="${q.id}" placeholder="Escribí la respuesta…" value="${esc(val)}" autocomplete="off">`;
+          })()
+          : (() => {
           const checked = S().answers[q.id] || [];
           const opts = it.optOrder.map((orig, disp) => {
             const on = checked.indexOf(disp) >= 0;
@@ -267,7 +273,7 @@
         <div class="qhead">
           <span class="qnum">${i + 1}<span class="muted">/${n}</span></span>
           ${q.category ? `<span class="chip">${esc(q.category)}</span>` : ""}
-          ${q.type === "dropdown" ? `<span class="chip">dropdown</span>` : ""}
+          ${q.type === "dropdown" ? `<span class="chip">dropdown</span>` : q.type === "fill" ? `<span class="chip">rellenar</span>` : ""}
           <span class="chip warn" ${answeredNow ? "style='display:none'" : ""}>sin responder</span>
         </div>
         ${body}
@@ -335,6 +341,19 @@
         updateQuizUI();
       });
     });
+    document.querySelectorAll(".fill-input").forEach((inp) => {
+      inp.addEventListener("input", (e) => {
+        const qid = parseInt(e.target.dataset.q, 10);
+        Quiz.setFill(qid, e.target.value);
+        const card = document.getElementById("qcard-" + qid);
+        const answeredNow = Quiz.isAnswered(qid);
+        const chip = card.querySelector(".chip.warn");
+        if (chip) chip.style.display = answeredNow ? "none" : "";
+        if (answeredNow) card.removeAttribute("data-unanswered");
+        else card.setAttribute("data-unanswered", "");
+        updateQuizUI();
+      });
+    });
   }
 
   function submitQuiz() {
@@ -353,7 +372,7 @@
 
     const rows = r.detail.map((d, i) => {
       const [cls, lbl] = stateOf(d.state);
-      const opts = d.q.type === "dropdown"
+const opts = d.q.type === "dropdown"
         ? d.q.slots.map((txt, si) => {
           const ch = d.slotChosen ? d.slotChosen[si] : null;
           const isC = ch === d.q.correctSlot[si];
@@ -368,7 +387,22 @@
             <span class="opt-flag">${flag}</span>
           </div>`;
         }).join("")
-        : d.optOrder.map((orig, disp) => {
+        : d.q.type === "fill"
+          ? (() => {
+            const has = !!d.fillAnswer;
+            const isC = d.score > 0 && has;
+            const oCls = isC ? "correct" : has ? "wrong" : "missed";
+            const flag = isC ? "✓" : has ? "✗" : "sin responder";
+            return `<div class="opt ${oCls}" style="cursor:default">
+              <span class="alpha">1</span>
+              <span>
+                <b>Tu respuesta:</b> ${has ? esc(d.fillAnswer) : "—"}<br>
+                <span class="muted small">Correcta:</span> ${d.q.correct.map((c) => esc(c)).join(" / ")}
+              </span>
+              <span class="opt-flag">${flag}</span>
+            </div>`;
+          })()
+          : d.optOrder.map((orig, disp) => {
           const isC = d.q.correct.indexOf(orig) >= 0;
           const was = d.dispChecked.indexOf(disp) >= 0;
           const oCls = isC && was ? "correct" : isC ? "missed" : was ? "wrong" : "";

@@ -28,7 +28,7 @@ pregunta,categoria,opcion1,opcion2,opcion3,opcion4,opcion5,opcion6,opcion7,opcio
 
 Reglas y tolerancias:
 
-- Máximo **200 preguntas** por archivo.
+- Máximo **1000 preguntas** por archivo.
 - Mínimo 2 opciones, máximo 8; al menos una correcta.
 - El delimitador puede ser `,`, `;` o tabulación (se detecta solo). Se aceptan comillas alrededor de un campo y comas dentro del campo entrecomillado.
 - Los nombres de columna toleran variantes: `pregunta/question/enunciado`, `categoria/category/tema`, `correctas/respuestas/answer(s)`, `explicacion/explanation/nota` (sin tildes, se normalizan).
@@ -69,6 +69,20 @@ pregunta,categoria,respuesta1,respuesta2,respuesta3,opciones,explicacion
 - Cada valor de `respuestaN` debe coincidir textualmente con una de las opciones de la columna `opciones`; si no coincide o falta la columna, la fila se omite con un aviso.
 - El puntaje de una pregunta dropdown es `1 / cant. de respuestas` por cada espacio correcto, y se descuenta lo mismo por cada espacio mal respondido (los espacios sin responder suman 0).
 - Un mismo archivo puede combinar preguntas con `opcion1…opcion8` + `correctas` y preguntas con `respuesta1…` + `opciones`; cada fila se interpreta según sus columnas.
+
+### Preguntas de completar (fill)
+
+Si el encabezado **no tiene columnas de opciones ni `respuesta1…N`**, el archivo se interpreta como preguntas de escribir la respuesta en un cuadro de texto. La columna `correctas` lleva la o las respuestas correctas como **texto literal**; para aceptar más de una variante separalas con `;` (o `|`):
+
+```
+pregunta,categoria,correctas,explicacion
+"¿Cuál es la capital de Francia?","Geo","París","Ver apunte"
+"Código del país","Geo","ARG;Argentina;República Argentina",""
+```
+
+- La comparación ignora mayúsculas, tildes y espacios extra (ej. `paris`, `PARÍS` y `parís ` son todas correctas).
+- Puntaje: +1 si la respuesta escrita coincide, −1 si no coincide (y no está vacía), 0 si se deja vacía.
+- Un archivo fill no puede mezclarse con preguntas de opciones o dropdown: si el encabezado tiene `opcion1…` u `opciones` + `respuesta1…`, el resto de las filas siguen esas reglas.
 
 ## Cómo funciona
 

@@ -28,6 +28,12 @@ const Quiz = (() => {
     return Math.round(s * 100000) / 100000;
   }
 
+  function scoreFill(q, text) {
+    const t = CSV.normText(text);
+    if (!t) return 0;
+    return q.correct.some((c) => CSV.normText(c) === t) ? 1 : -1;
+  }
+
   function scoreDropdown(q, chosen) {
     const unit = 1 / q.slots.length;
     let s = 0;
@@ -42,7 +48,7 @@ const Quiz = (() => {
   function loadSettings() {
     const saved = Store.loadSettings();
     const size = parseInt(saved.sessionSize, 10);
-    S.settings.size = size === 0 ? 0 : (isNaN(size) ? 20 : Math.min(200, Math.max(1, size)));
+    S.settings.size = size === 0 ? 0 : (isNaN(size) ? 20 : Math.min(1000, Math.max(1, size)));
     const pts = parseFloat(saved.points);
     S.settings.points = isNaN(pts) ? 1 : Math.max(0.05, pts);
   }
@@ -78,7 +84,7 @@ const Quiz = (() => {
 
   function setSize(n) {
     const v = parseInt(n, 10);
-    S.settings.size = v === 0 ? 0 : (isNaN(v) ? 20 : Math.min(200, Math.max(1, v)));
+    S.settings.size = v === 0 ? 0 : (isNaN(v) ? 20 : Math.min(1000, Math.max(1, v)));
     persistSettings();
   }
 
@@ -122,9 +128,17 @@ const Quiz = (() => {
     saveDraft();
   }
 
+  function setFill(qid, text) {
+    const v = String(text || "").trim();
+    if (v) S.answers[qid] = v;
+    else delete S.answers[qid];
+    saveDraft();
+  }
+
   const isAnswered = (qid) => {
     const a = S.answers[qid];
     if (!a) return false;
+    if (typeof a === "string") return a.length > 0;
     return Array.isArray(a) ? a.length > 0 : Object.keys(a).length > 0;
   };
   const answeredCount = () => S.items.filter((it) => isAnswered(it.q.id)).length;
@@ -144,6 +158,16 @@ const Quiz = (() => {
         const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
         marked[state].push(q.id);
         return { q, optOrder: [], slotChosen: chosen, score, state };
+      }
+      if (q.type === "fill") {
+        const answer = typeof S.answers[q.id] === "string" ? S.answers[q.id] : "";
+        const score = scoreFill(q, answer);
+        const full = score + 1e-9 >= pts;
+        S.progress[q.id] = Sched.update(S.progress[q.id] || Sched.newCard(), score, full);
+        total += score;
+        const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
+        marked[state].push(q.id);
+        return { q, optOrder: [], fillAnswer: answer, score, state };
       }
       const dispChecked = (S.answers[q.id] || []).slice().sort((a, b) => a - b);
       const origChecked = dispChecked.map((d) => it.optOrder[d]);
@@ -228,7 +252,7 @@ const Quiz = (() => {
   }
 
   return {
-    S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle, setSlot,
+    S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle, setSlot, setFill,
     isAnswered, answeredCount, submit, tryResume, resetProgress,
     persistSettings, setSize, setPoints, stats, failedCount, scoreQuestion
   };
