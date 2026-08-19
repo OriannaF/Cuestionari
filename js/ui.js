@@ -11,6 +11,37 @@
   const LETTERS = "ABCDEFGHIJ";
   const stat = (cls, num, lbl) => `<div class="stat"><div class="num ${cls}">${num}</div><div class="lbl">${lbl}</div></div>`;
 
+  const FILE_PROTO = window.location.protocol === "file:";
+  const TEMPLATE_CSV = `pregunta,categoria,opcion1,opcion2,opcion3,opcion4,opcion5,opcion6,opcion7,opcion8,correctas,explicacion
+"¿Cuál es la capital de Francia?","Geografía","París","Londres","Berlín","Madrid","Roma","Lisboa","Viena","Bruselas","1","París es la capital de Francia, conocida como la Ciudad de la Luz."
+"¿Cuál es la capital de Australia?","Geografía","Sídney","Melbourne","Canberra","Perth","Adelaida","","","","3","Canberra es la capital, aunque Sídney sea la ciudad más famosa."
+"¿Qué océano baña las costas de la Argentina?","Geografía","Pacífico","Atlántico","Índico","Ártico","Glacial Antártico","","","","2","Las costas argentinas dan al océano Atlántico."
+"¿En qué continente se encuentra Egipto?","Geografía","Asia","Europa","África","Oceanía","América del Sur","","","","3","Egipto está en el noreste de África, junto al mar Mediterráneo."
+"¿Cuáles de estos son números primos?","Matemática","2","4","7","9","15","23","","","1;3;6","Un número primo tiene exactamente dos divisores: 1 y sí mismo."
+"¿Cuáles son soluciones de la ecuación x² − 5x + 6 = 0?","Matemática","1","2","3","4","6","","","","2;3","Al reemplazar: 2² − 10 + 6 = 0 y 3² − 15 + 6 = 0."
+"¿Cuáles de estos números son pares?","Matemática","2","5","8","11","14","","","","1;3;5","Un número es par si su última cifra es 0, 2, 4, 6 u 8."
+"¿Qué porcentaje representa la mitad de un total?","Matemática","25 %","50 %","75 %","10 %","","","","","2","La mitad de un total equivale al 50 %."
+"¿Cuáles de las siguientes palabras son agudas?","Lengua","café","lápiz","reloj","árbol","teléfono","sofá","","","1;3;6","Las agudas llevan tilde al terminar en vocal, n o s. 'Lápiz' y 'árbol' son graves; 'teléfono' es esdrújula."
+"¿Cuál es el resultado de 7 × 8?","Matemática","54","56","64","48","","","","","2","7 × 8 = 56."
+"¿Cuáles de estas son unidades del Sistema Internacional (SI)?","Ciencia","newton","libra","julio","pie","watt","","","","1;3;5","La libra y el pie son unidades imperiales, no SI."
+"¿Cuáles de estos son gases de efecto invernadero?","Ciencia","CO2","CH4","N2O","O2","N2","H2O","","","1;2;3","El CO2, el metano (CH4) y el óxido nitroso (N2O) atrapan calor en la atmósfera."
+"¿Cuál es el símbolo químico del hierro?","Ciencia","H","He","Fe","Ir","Fr","","","","3","Fe proviene de 'ferrum', su nombre en latín."
+"¿Cuáles de los siguientes son organismos procariotas?","Ciencia","Bacterias","Hongos","Arqueas","Virus","Levaduras","","","","1;3","Los virus no se consideran seres vivos con células; los hongos y levaduras son eucariotas."
+"¿Cuáles son planetas rocosos del sistema solar?","Ciencia","Mercurio","Venus","Tierra","Marte","Júpiter","Saturno","","","1;2;3;4","Los gigantes gaseosos son Júpiter, Saturno, Urano y Neptuno."
+"¿A cuántos grados centígrados hierve el agua a nivel del mar?","Ciencia","90","100","110","120","","","","","2","A nivel del mar el punto de ebullición del agua es 100 °C."
+"¿En qué año se produjo la Revolución de Mayo en Argentina?","Historia","1806","1810","1816","1820","","","","","2","Fue el 25 de mayo de 1810; la Independencia se declaró recién en 1816."
+"¿Cuáles de estos fueron protagonistas de la Revolución de Mayo?","Historia","Mariano Moreno","Manuel Belgrano","Juan José Castelli","Juan Manuel de Rosas","Bartolomé Mitre","","","","1;2;3","Rosas y Mitre actuaron en etapas posteriores de la historia argentina."
+"¿A qué distancia se ejecuta un penal en fútbol?","Deportes","9,15 m","11 m","12 m","16,5 m","","","","","2","El punto penal está a 11 metros (12 yardas) del arco."
+"¿Cuántos jugadores hay en cancha por equipo en vóley?","Deportes","5","6","7","9","","","","","2","Cada equipo tiene 6 jugadores en cancha."
+"¿Cuáles de estos lenguajes se compilan a código máquina?","Informática","C","Python","Rust","JavaScript","Go","","","","1;3;5","Python y JavaScript son interpretados (o compilados en tiempo de ejecución)."
+"¿Qué significa la sigla HTML?","Informática","HyperText Markup Language","HighText Machine Language","Hyperlink Text Management Language","HyperText Multi Language","","","","","1","HTML define la estructura de las páginas web."`;
+
+  function loadTemplateText() {
+    return fetch("data/cuestionario.csv")
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
+      .catch(() => (FILE_PROTO ? Promise.resolve(TEMPLATE_CSV) : Promise.reject(new Error("no file"))));
+  }
+
   function toast(msg) {
     let el = document.getElementById("toast");
     if (!el) {
@@ -25,8 +56,7 @@
   }
 
   function init() {
-    fetch("data/cuestionario.csv")
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
+    loadTemplateText()
       .then((txt) => {
         const res = Quiz.loadCsv(txt, "data/cuestionario.csv");
         if (res.ok) {
@@ -88,17 +118,17 @@
         <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>
         <div class="btn-row justify-center">
           <button class="btn" id="btn-template">Usar plantilla de ejemplo</button>
-          <a class="btn outline" href="data/cuestionario.csv" download>Descargar plantilla CSV</a>
+          <a class="btn outline" id="btn-download-template" href="data/cuestionario.csv" download>Descargar plantilla CSV</a>
         </div>
       </div>
     `);
     bindUpload("dropzone", "file");
     document.getElementById("btn-template").addEventListener("click", loadTemplate);
+    bindTemplateDownload("btn-download-template");
   }
 
   function loadTemplate() {
-    fetch("data/cuestionario.csv")
-      .then((r) => r.text())
+    loadTemplateText()
       .then((txt) => {
         const res = Quiz.loadCsv(txt, "Plantilla de ejemplo");
         if (res.ok) {
@@ -109,6 +139,15 @@
         }
       })
       .catch(() => toast("No se pudo descargar la plantilla"));
+  }
+
+  function bindTemplateDownload(btnId) {
+    const a = document.getElementById(btnId);
+    if (!a) return;
+    loadTemplateText().then((txt) => {
+      const blob = new Blob([txt], { type: "text/csv" });
+      a.href = URL.createObjectURL(blob);
+    }).catch(() => {});
   }
 
   function renderLoadError(errors) {
