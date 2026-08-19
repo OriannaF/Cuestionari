@@ -7,6 +7,17 @@
 
   const esc = (v) => String(v == null ? "" : v)
     .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const rich = (v) => String(v == null ? "" : v)
+    .split(/(!\[[^\]]*\]\([^)]*\))/g)
+    .map((p) => {
+      const m = /^!\[([^\]]*)\]\(([^)]*)\)$/.exec(p);
+      if (!m) return esc(p);
+      const s = (m[2] || "").trim();
+      if (/^(?:javascript|vbscript):/i.test(s)) return esc(p);
+      if (/^data:/i.test(s) && !/^data:image\//i.test(s)) return esc(p);
+      return ` <img class="qimg" src="${esc(s)}" alt="${esc((m[1] || "").trim())}" loading="lazy"> `;
+    })
+    .join("");
   const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString("es", { maximumFractionDigits: 2 });
   const LETTERS = "ABCDEFGHIJ";
   const stat = (cls, num, lbl) => `<div class="stat"><div class="num ${cls}">${num}</div><div class="lbl">${lbl}</div></div>`;
@@ -227,23 +238,39 @@
     const answered = Quiz.answeredCount();
     const cards = items.map((it, i) => {
       const q = it.q;
-      const checked = S().answers[q.id] || [];
-      const opts = it.optOrder.map((orig, disp) => {
-        const on = checked.indexOf(disp) >= 0;
-        return `<label class="opt ${on ? "checked" : ""}">
-          <input type="checkbox" class="hidden-input" data-q="${q.id}" data-d="${disp}" ${on ? "checked" : ""}>
-          <span class="alpha">${LETTERS[disp]}</span>
-          <span>${esc(q.options[orig])}</span>
-        </label>`;
-      }).join("");
-      return `<div class="qcard" id="qcard-${q.id}" ${checked.length ? "" : "data-unanswered"}>
+      const answeredNow = Quiz.isAnswered(q.id);
+      const body = q.type === "dropdown"
+        ? (() => {
+          const chosen = S().answers[q.id] || {};
+          const rows = q.slots.map((txt, si) => `<label class="slot">
+            <span class="slot-num">${si + 1}</span>
+            <select class="input slot-select" data-q="${q.id}" data-slot="${si}">
+              <option value="">Elegí una opción…</option>
+              ${q.dropdown.map((opt, j) => `<option value="${j}" ${j === chosen[si] ? "selected" : ""}>${esc(opt)}</option>`).join("")}
+            </select>
+          </label>`).join("");
+          return `<div class="qtext">${rich(q.text)}</div><div class="slot-grid">${rows}</div>`;
+        })()
+        : (() => {
+          const checked = S().answers[q.id] || [];
+          const opts = it.optOrder.map((orig, disp) => {
+            const on = checked.indexOf(disp) >= 0;
+            return `<label class="opt ${on ? "checked" : ""}">
+              <input type="checkbox" class="hidden-input" data-q="${q.id}" data-d="${disp}" ${on ? "checked" : ""}>
+              <span class="alpha">${LETTERS[disp]}</span>
+              <span>${rich(q.options[orig])}</span>
+            </label>`;
+          }).join("");
+          return `<div class="qtext">${rich(q.text)}</div><div class="opt-grid">${opts}</div>`;
+        })();
+      return `<div class="qcard" id="qcard-${q.id}" ${answeredNow ? "" : "data-unanswered"}>
         <div class="qhead">
           <span class="qnum">${i + 1}<span class="muted">/${n}</span></span>
           ${q.category ? `<span class="chip">${esc(q.category)}</span>` : ""}
-          <span class="chip warn" ${checked.length ? "style='display:none'" : ""}>sin responder</span>
+          ${q.type === "dropdown" ? `<span class="chip">dropdown</span>` : ""}
+          <span class="chip warn" ${answeredNow ? "style='display:none'" : ""}>sin responder</span>
         </div>
-        <div class="qtext">${esc(q.text)}</div>
-        <div class="opt-grid">${opts}</div>
+        ${body}
       </div>`;
     }).join("");
 
@@ -285,7 +312,22 @@
         Quiz.toggle(qid, disp);
         e.target.closest(".opt").classList.toggle("checked", e.target.checked);
         const card = document.getElementById("qcard-" + qid);
-        const answeredNow = (S().answers[qid] || []).length > 0;
+        const answeredNow = Quiz.isAnswered(qid);
+        const chip = card.querySelector(".chip.warn");
+        if (chip) chip.style.display = answeredNow ? "none" : "";
+        if (answeredNow) card.removeAttribute("data-unanswered");
+        else card.setAttribute("data-unanswered", "");
+        updateQuizUI();
+      });
+    });
+    document.querySelectorAll(".slot-select").forEach((sel) => {
+      sel.addEventListener("change", (e) => {
+        const qid = parseInt(e.target.dataset.q, 10);
+        const slot = parseInt(e.target.dataset.slot, 10);
+        const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+        Quiz.setSlot(qid, slot, val);
+        const card = document.getElementById("qcard-" + qid);
+        const answeredNow = Quiz.isAnswered(qid);
         const chip = card.querySelector(".chip.warn");
         if (chip) chip.style.display = answeredNow ? "none" : "";
         if (answeredNow) card.removeAttribute("data-unanswered");
@@ -311,17 +353,32 @@
 
     const rows = r.detail.map((d, i) => {
       const [cls, lbl] = stateOf(d.state);
-      const opts = d.optOrder.map((orig, disp) => {
-        const isC = d.q.correct.indexOf(orig) >= 0;
-        const was = d.dispChecked.indexOf(disp) >= 0;
-        const oCls = isC && was ? "correct" : isC ? "missed" : was ? "wrong" : "";
-        const flag = isC && was ? "✓" : isC ? "correcta" : was ? "✗" : "";
-        return `<div class="opt ${oCls}" style="cursor:default">
-          <span class="alpha">${LETTERS[disp]}</span>
-          <span>${esc(d.q.options[orig])}</span>
-          <span class="opt-flag">${flag}</span>
-        </div>`;
-      }).join("");
+      const opts = d.q.type === "dropdown"
+        ? d.q.slots.map((txt, si) => {
+          const ch = d.slotChosen ? d.slotChosen[si] : null;
+          const isC = ch === d.q.correctSlot[si];
+          const oCls = isC ? "correct" : ch == null ? "missed" : "wrong";
+          const flag = isC ? "✓" : ch == null ? "sin responder" : "✗";
+          return `<div class="opt ${oCls}" style="cursor:default">
+            <span class="alpha">${si + 1}</span>
+            <span><b>${rich(txt)}</b><br>
+              <span class="muted small">Tu respuesta:</span> ${ch == null ? "—" : esc(d.q.dropdown[ch])}<br>
+              <span class="muted small">Correcta:</span> ${esc(d.q.dropdown[d.q.correctSlot[si]])}
+            </span>
+            <span class="opt-flag">${flag}</span>
+          </div>`;
+        }).join("")
+        : d.optOrder.map((orig, disp) => {
+          const isC = d.q.correct.indexOf(orig) >= 0;
+          const was = d.dispChecked.indexOf(disp) >= 0;
+          const oCls = isC && was ? "correct" : isC ? "missed" : was ? "wrong" : "";
+          const flag = isC && was ? "✓" : isC ? "correcta" : was ? "✗" : "";
+          return `<div class="opt ${oCls}" style="cursor:default">
+            <span class="alpha">${LETTERS[disp]}</span>
+            <span>${rich(d.q.options[orig])}</span>
+            <span class="opt-flag">${flag}</span>
+          </div>`;
+        }).join("");
       return `
         <div class="qcard">
           <div class="qhead">
@@ -330,9 +387,9 @@
             <span class="badge ${cls}">${lbl}</span>
             <span class="score-chip">${fmt(d.score)} p</span>
           </div>
-          <div class="qtext">${esc(d.q.text)}</div>
+          <div class="qtext">${rich(d.q.text)}</div>
           <div class="opt-grid">${opts}</div>
-          ${d.q.explanation ? `<div class="explain">${esc(d.q.explanation)}</div>` : ""}
+          ${d.q.explanation ? `<div class="explain">${rich(d.q.explanation)}</div>` : ""}
         </div>`;
     }).join("");
 

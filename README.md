@@ -33,6 +33,43 @@ Reglas y tolerancias:
 - El delimitador puede ser `,`, `;` o tabulación (se detecta solo). Se aceptan comillas alrededor de un campo y comas dentro del campo entrecomillado.
 - Los nombres de columna toleran variantes: `pregunta/question/enunciado`, `categoria/category/tema`, `correctas/respuestas/answer(s)`, `explicacion/explanation/nota` (sin tildes, se normalizan).
 
+### Imágenes en preguntas, opciones y explicaciones
+
+Para incluir una imagen escribí dentro del texto de cualquier celda (pregunta, opción o explicación):
+
+```
+![texto opcional](ruta-de-la-imagen)
+```
+
+Ejemplo:
+
+```
+pregunta,categoria,opcion1,opcion2,opcion3,correctas,explicacion
+"Dado el siguiente diagrama. La relación E representa: ![diagrama](img/diagrama-e.png)","UML","Generalizacion","Asociacion","<<extend>>","3","Es una asociación, ver ![resumen](img/resumen.png)"
+```
+
+- La ruta puede ser relativa (ej. `img/diagrama.png`, `./img/x.jpg`, `../img/y.gif`) o absoluta (`https://...`, `//cdn...`, `data:image/png;base64,...`).
+- Las rutas relativas se resuelven contra la página, así que conviene subir las imágenes junto al CSV (ej. en una carpeta `img/` al lado de `data/cuestionario.csv`) y usar rutas como `../img/...` o absolutas.
+- La imagen se muestra dentro de la pregunta, debajo del texto de la opción, o dentro de la explicación en los resultados.
+
+### Preguntas con respuestas desplegables (dropdown)
+
+En vez de opciones a marcar, la pregunta puede pedir completar espacios con un menú desplegable por espacio:
+
+```
+pregunta,categoria,respuesta1,respuesta2,respuesta3,opciones,explicacion
+"La capital de Francia es ___ y la de Italia es ___.","Geo","París","Roma","","París;Berlín;Madrid;Roma;Londres","Ver apunte"
+```
+
+| Columna | Obligatoria | Descripción |
+|---|---|---|
+| `respuesta1` … `respuestaN` | sí (al menos 1) | Texto de la respuesta correcta en esa posición |
+| `opciones` | sí (mínimo 2) | Todas las opciones posibles del desplegable, separadas por `;` (o `\|`) |
+
+- Cada valor de `respuestaN` debe coincidir textualmente con una de las opciones de la columna `opciones`; si no coincide o falta la columna, la fila se omite con un aviso.
+- El puntaje de una pregunta dropdown es `1 / cant. de respuestas` por cada espacio correcto, y se descuenta lo mismo por cada espacio mal respondido (los espacios sin responder suman 0).
+- Un mismo archivo puede combinar preguntas con `opcion1…opcion8` + `correctas` y preguntas con `respuesta1…` + `opciones`; cada fila se interpreta según sus columnas.
+
 ## Cómo funciona
 
 - **Sin feedback durante la sesión**: no se muestra cuál es la opción correcta hasta que finalizás todas las preguntas.

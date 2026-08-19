@@ -61,6 +61,7 @@ const CSV = (() => {
   const isCategoria = (n) => ["categoria", "category", "tema", "materia", "area"].includes(n);
   const isCorrectas = (n) => ["correctas", "correcta", "respuestas", "respuesta", "respuestascorrectas", "clave", "answers", "answer"].includes(n);
   const isExplicacion = (n) => ["explicacion", "explicacionrespuesta", "explanation", "nota", "retroalimentacion"].includes(n);
+  const isOpciones = (n) => ["opciones", "opcionesdropdown", "opcionesdedropdown", "opcionesrespuesta", "dropdown", "respuestasposibles"].includes(n);
 
   function parseQuestions(text) {
     const rows = parseCSV(text);
@@ -69,14 +70,20 @@ const CSV = (() => {
     const data = rows.slice(1);
     if (!data.length) return { ok: false, errors: ["El CSV solo contiene el encabezado, no hay preguntas."] };
 
-    let qi = -1, ci = -1, cati = -1, expi = -1;
+    let qi = -1, ci = -1, cati = -1, expi = -1, oi = -1;
+    const slotCols = [];
     header.forEach((h, i) => {
       const n = norm(h);
-      if (isPregunta(n)) { if (qi === -1) qi = i; }
+      const sm = n.match(/^respuesta(\d+)$/);
+      if (sm) slotCols.push({ i, num: parseInt(sm[1], 10) });
+      else if (isPregunta(n)) { if (qi === -1) qi = i; }
       else if (isCorrectas(n)) { if (ci === -1) ci = i; }
       else if (isCategoria(n)) { if (cati === -1) cati = i; }
       else if (isExplicacion(n)) { if (expi === -1) expi = i; }
+      else if (isOpciones(n)) { if (oi === -1) oi = i; }
     });
+    slotCols.sort((a, b) => a.num - b.num);
+    const isDropdown = slotCols.length > 0;
     if (qi === -1) qi = 0;
     if (ci === -1) ci = header.length - 1;
     if (ci <= qi) return { ok: false, errors: ["La columna 'correctas' debe estar después de la columna de la pregunta."] };
@@ -92,6 +99,46 @@ const CSV = (() => {
       if (!textQ) {
         warnings.push(`Fila ${line}: falta el texto de la pregunta. Se omitió.`);
         continue;
+      }
+
+      if (isDropdown) {
+        const optsRaw = oi >= 0 ? String(row[oi] || "").trim() : "";
+        const dropdown = optsRaw ? optsRaw.split(/[;|]/).map((t) => t.trim()).filter(Boolean) : [];
+        const slotVals = [];
+        const slotErrors = [];
+        for (const sc of slotCols) {
+          const v = String(row[sc.i] || "").trim();
+          if (!v) continue;
+          const idx = dropdown.indexOf(v);
+          if (idx < 0) slotErrors.push(`'${v}' no está en la lista de opciones`);
+          else slotVals.push({ text: v, idx });
+        }
+        if (slotVals.length || dropdown.length >= 2) {
+          if (dropdown.length < 2) {
+            warnings.push(`Fila ${line}: falta la columna 'opciones' con al menos 2 respuestas posibles para el dropdown. Se omitió.`);
+            continue;
+          }
+          if (!slotVals.length) {
+            warnings.push(`Fila ${line}: no hay respuestas en las columnas 'respuesta1…' (celdas vacías). Se omitió.`);
+            continue;
+          }
+          if (slotErrors.length) {
+            warnings.push(`Fila ${line}: ${slotErrors.join("; ")}. Se omitió la pregunta.`);
+            continue;
+          }
+          questions.push({
+            id: questions.length,
+            type: "dropdown",
+            text: textQ,
+            options: [],
+            slots: slotVals.map((s) => s.text),
+            correctSlot: slotVals.map((s) => s.idx),
+            dropdown,
+            category: String(cati >= 0 ? row[cati] || "" : "").trim(),
+            explanation: String(expi >= 0 ? row[expi] || "" : "").trim()
+          });
+          continue;
+        }
       }
 
       const options = [];
@@ -127,6 +174,7 @@ const CSV = (() => {
 
       questions.push({
         id: questions.length,
+        type: "select",
         text: textQ,
         options,
         correct: correct.sort((a, b) => a - b),

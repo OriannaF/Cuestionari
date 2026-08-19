@@ -28,6 +28,17 @@ const Quiz = (() => {
     return Math.round(s * 100000) / 100000;
   }
 
+  function scoreDropdown(q, chosen) {
+    const unit = 1 / q.slots.length;
+    let s = 0;
+    for (let i = 0; i < q.slots.length; i++) {
+      const c = chosen == null ? null : chosen[i];
+      if (c === q.correctSlot[i]) s += unit;
+      else if (c != null) s -= unit;
+    }
+    return Math.round(s * 100000) / 100000;
+  }
+
   function loadSettings() {
     const saved = Store.loadSettings();
     const size = parseInt(saved.sessionSize, 10);
@@ -104,7 +115,18 @@ const Quiz = (() => {
     saveDraft();
   }
 
-  const isAnswered = (qid) => (S.answers[qid] || []).length > 0;
+  function setSlot(qid, slot, optIdx) {
+    const a = S.answers[qid] = S.answers[qid] || {};
+    if (optIdx == null) delete a[slot];
+    else a[slot] = optIdx;
+    saveDraft();
+  }
+
+  const isAnswered = (qid) => {
+    const a = S.answers[qid];
+    if (!a) return false;
+    return Array.isArray(a) ? a.length > 0 : Object.keys(a).length > 0;
+  };
   const answeredCount = () => S.items.filter((it) => isAnswered(it.q.id)).length;
 
   function submit() {
@@ -113,6 +135,16 @@ const Quiz = (() => {
     let total = 0;
     const detail = S.items.map((it) => {
       const q = it.q;
+      if (q.type === "dropdown") {
+        const chosen = S.answers[q.id] || {};
+        const score = scoreDropdown(q, chosen);
+        const full = score + 1e-9 >= pts;
+        S.progress[q.id] = Sched.update(S.progress[q.id] || Sched.newCard(), score, full);
+        total += score;
+        const state = full ? "correct" : (score > 1e-9 ? "partial" : "failed");
+        marked[state].push(q.id);
+        return { q, optOrder: [], slotChosen: chosen, score, state };
+      }
       const dispChecked = (S.answers[q.id] || []).slice().sort((a, b) => a - b);
       const origChecked = dispChecked.map((d) => it.optOrder[d]);
       const score = scoreQuestion(q, origChecked);
@@ -196,7 +228,7 @@ const Quiz = (() => {
   }
 
   return {
-    S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle,
+    S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle, setSlot,
     isAnswered, answeredCount, submit, tryResume, resetProgress,
     persistSettings, setSize, setPoints, stats, failedCount, scoreQuestion
   };
