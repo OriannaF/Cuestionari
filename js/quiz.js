@@ -49,7 +49,16 @@ const Quiz = (() => {
     S.answers = {};
     S.results = null;
     loadSettings();
+    Store.saveLastCsv({ text, name });
     return res;
+  }
+
+  function tryLoadSaved() {
+    const saved = Store.loadLastCsv();
+    if (!saved || !String(saved.text || "").trim()) return false;
+    if (!CSV.parseQuestions(saved.text).ok) return false;
+    loadCsv(saved.text, saved.name || "Cuestionario guardado");
+    return true;
   }
 
   function persistSettings() {
@@ -187,7 +196,7 @@ const Quiz = (() => {
   }
 
   return {
-    S, loadCsv, newSession, repeatSession, failedSession, toggle,
+    S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle,
     isAnswered, answeredCount, submit, tryResume, resetProgress,
     persistSettings, setSize, setPoints, stats, failedCount, scoreQuestion
   };

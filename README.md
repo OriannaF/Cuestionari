@@ -8,7 +8,7 @@ Cuestionario de opción múltiple (de 2 a 8 opciones, con varias respuestas corr
 2. En GitHub: **Settings → Pages → Source: Deploy from a branch → Rama `main` (`/root`)** → Save.
 3. En pocos minutos estará en `https://TU-USUARIO.github.io/TU-REPO/`.
 
-Al abrir la página se carga automáticamente el archivo `data/cuestionario.csv`. Para usar tus propias preguntas, reemplazá ese archivo (y volvé a pushear), o cargá un CSV manualmente desde la página (también funciona arrastrando y soltando).
+Al abrir la página se recupera el último CSV que cargaste (guardado localmente en tu navegador) o, si no, te pide que subas uno. También podés dejar un archivo `data/cuestionario.csv` en el repo: si existe, se usa en primer lugar.
 
 ## Formato del CSV
 
@@ -51,8 +51,9 @@ Reglas y tolerancias:
 ## Progreso guardado
 
 - El progreso queda en el navegador donde estudias (localStorage), identificado por el contenido del CSV. Si cambiás el CSV, arranca un progreso nuevo (el anterior no se pierde).
+- El último CSV cargado también se guarda en el navegador: al reabrir la página tenés las mismas preguntas, sin volver a subirlo.
 - Si salís a mitad de sesión, tus respuestas quedan guardadas y podés continuarlas desde el inicio.
-- Borrar los datos del sitio desde el navegador resetea todo el progreso.
+- Borrar los datos del sitio desde el navegador resetea todo el progreso y el CSV guardado.
 - Para estudiar en otro dispositivo hay que repetir el progreso ahí (o exportar/importar `localStorage`).
 
 ## Estructura
@@ -63,13 +64,12 @@ Reglas y tolerancias:
 ├── js/csv.js             # parser CSV y validación (máx. 200 preguntas, 8 opciones)
 ├── js/scheduler.js       # repetición espaciada + barajar (Fisher-Yates)
 ├── js/quiz.js            # sesiones, puntaje con penalización, persistencia
-├── js/storage.js         # localStorage
+├── js/storage.js         # localStorage (progreso y último CSV cargado)
 ├── js/ui.js              # vistas
-└── data/cuestionario.csv # plantilla de ejemplo (reemplazala por la tuya)
 ```
 
 ## Sugerencias
 
 - **Vos hiciste tu CSV en Excel/Google Sheets**: exportá como CSV (UTF‑8). Si usa `;` como separador, se detecta automáticamente.
 - Para preguntas largas, poné el enunciado entre comillas en el CSV.
-- La plantilla incluida es solo un ejemplo: borrá todo y poné tus 200 preguntas en `data/cuestionario.csv` y volvé a pushear.
+- Si querés que la página incluya un CSV de una vez (sin depender del navegador), borrá el archivo `data/cuestionario.csv` reemplazándolo por el tuyo y volvé a pushear.
