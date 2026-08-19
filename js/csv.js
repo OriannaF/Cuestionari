@@ -63,7 +63,6 @@ const CSV = (() => {
   const isExplicacion = (n) => ["explicacion", "explicacionrespuesta", "explanation", "nota", "retroalimentacion"].includes(n);
 
   function parseQuestions(text) {
-    const errors = [];
     const rows = parseCSV(text);
     if (!rows.length) return { ok: false, errors: ["El archivo está vacío."] };
     const header = rows[0];
@@ -81,14 +80,19 @@ const CSV = (() => {
     if (qi === -1) qi = 0;
     if (ci === -1) ci = header.length - 1;
     if (ci <= qi) return { ok: false, errors: ["La columna 'correctas' debe estar después de la columna de la pregunta."] };
-    if (data.length > MAX) errors.push(`El archivo tiene ${data.length} preguntas y el máximo permitido es ${MAX} (revisá el CSV o dividilo).`);
+    if (data.length > MAX) return { ok: false, errors: [`El archivo tiene ${data.length} preguntas y el máximo permitido es ${MAX} (revisá el CSV o dividilo).`] };
 
     const questions = [];
+    const warnings = [];
     for (let r = 0; r < data.length; r++) {
       const row = data[r];
       const line = r + 2;
+      const rowErrors = [];
       const textQ = String(row[qi] || "").trim();
-      if (!textQ) { errors.push(`Fila ${line}: falta el texto de la pregunta.`); continue; }
+      if (!textQ) {
+        warnings.push(`Fila ${line}: falta el texto de la pregunta. Se omitió.`);
+        continue;
+      }
 
       const options = [];
       for (let c = qi + 1; c < ci && c < row.length; c++) {
@@ -96,8 +100,8 @@ const CSV = (() => {
         const v = String(row[c] || "").trim();
         if (v) options.push(v);
       }
-      if (options.length < 2) errors.push(`Fila ${line}: se necesitan al menos 2 opciones (se encontraron ${options.length}).`);
-      else if (options.length > 8) errors.push(`Fila ${line}: máximo 8 opciones por pregunta (se encontraron ${options.length}).`);
+      if (options.length < 2) rowErrors.push(`se necesitan al menos 2 opciones (se encontraron ${options.length})`);
+      else if (options.length > 8) rowErrors.push(`máximo 8 opciones por pregunta (se encontraron ${options.length})`);
 
       const raw = String(row[ci] || "").trim();
       const tokens = raw ? raw.split(/[;|,]/) : [];
@@ -107,14 +111,19 @@ const CSV = (() => {
         const n = parseInt(t.trim(), 10);
         if (!Number.isFinite(n)) continue;
         if (n < 1 || n > options.length) {
-          errors.push(`Fila ${line}: la opción correcta ${n} está fuera de rango (1 a ${options.length}).`);
+          rowErrors.push(`la opción correcta ${n} está fuera de rango (1 a ${options.length})`);
           continue;
         }
         if (seen.has(n)) continue;
         seen.add(n);
         correct.push(n - 1);
       }
-      if (!correct.length) errors.push(`Fila ${line}: la columna 'correctas' no tiene índices válidos (ej. 1;3;5). Todas las filas deben tener tantas celdas como el encabezado: si la pregunta usa menos de 8 opciones, dejá las celdas restantes vacías.`);
+      if (!correct.length) rowErrors.push(`la columna 'correctas' no tiene índices válidos (ej. 1;3;5). Si la pregunta usa menos de 8 opciones, dejá las celdas restantes vacías`);
+
+      if (rowErrors.length) {
+        warnings.push(`Fila ${line}: ${rowErrors.join("; ")}. Se omitió la pregunta.`);
+        continue;
+      }
 
       questions.push({
         id: questions.length,
@@ -125,8 +134,8 @@ const CSV = (() => {
         explanation: String(expi >= 0 ? row[expi] || "" : "").trim()
       });
     }
-    if (errors.length) return { ok: false, errors };
-    return { ok: true, questions };
+    if (warnings.length) return { ok: true, questions, warnings };
+    return { ok: true, questions, warnings: [] };
   }
 
   return { parseCSV, parseQuestions, MAX };

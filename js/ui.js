@@ -197,6 +197,12 @@
             <button class="btn" id="btn-discard">Descartar</button>
           </div>
         </div>` : ""}
+      ${S().warnings.length ? `
+        <div class="card warn-card">
+          <h2>Filas omitidas (${S().warnings.length})</h2>
+          <p class="muted small">Se cargaron las preguntas válidas. Estas filas se ignoraron:</p>
+          <div class="error-list">${S().warnings.map((w) => `<div class="error-item">${esc(w)}</div>`).join("")}</div>
+        </div>` : ""}
       <div class="card">
         <h2>Nueva sesión</h2>
         <div class="controls">

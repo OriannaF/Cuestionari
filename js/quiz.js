@@ -16,7 +16,8 @@ const Quiz = (() => {
     items: [],
     answers: {},
     results: null,
-    sourceText: ""
+    sourceText: "",
+    warnings: []
   };
 
   function scoreQuestion(q, checkedOrig) {
@@ -42,6 +43,7 @@ const Quiz = (() => {
     S.hash = Store.hash(text);
     S.name = name || "Cuestionario";
     S.questions = res.questions;
+    S.warnings = res.warnings || [];
     S.progress = Store.loadProgress(S.hash);
     S.items = [];
     S.answers = {};
