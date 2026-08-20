@@ -49,7 +49,7 @@
 
   const BUNDLED_NAME = "Final ADS";
 
-  function loadSource() {
+function loadSource() {
     return Promise.all([
       fetch("data/cuestionario.csv")
         .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
@@ -59,12 +59,12 @@
           if (res.ok) return true;
           throw res;
         }),
-      fetch("data/cuestionario_original.csv")
+      fetch("data/cuestionario Borboleto.csv")
         .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
         .then((txt) => {
-          if (!txt.trim()) return;
-          const res = Quiz.loadCsv(txt, "Final ADS - Original");
-          if (res.ok) return;
+          if (!txt.trim()) return Quiz.tryLoadSaved();
+          const res = Quiz.loadCsv(txt, "Borboleto");
+          if (res.ok) return true;
           throw res;
         })
     ]).then(([r1, r2]) => {
@@ -74,9 +74,21 @@
         toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
       } else if (r1 && r1.errors) {
         renderLoadError(r1.errors);
+      } else if (r2 && r2.ok) {
+        // Second CSV loaded successfully
+        warningsDismissed = false;
+        renderHome();
+        toast(`Cuestionarios cargados: ${S().questionnaires.length} (${S().questionnaires.map(q => q.name).join(", ")})`);
+      } else if (r2 && r2.errors) {
+        renderLoadError(r2.errors);
       } else {
         renderUpload();
       }
+    }).catch((err) => {
+      if (err && err.errors) return err;
+      return Quiz.tryLoadSaved();
+    });
+  }
     });
   }
 
