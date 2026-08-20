@@ -106,6 +106,10 @@ h2 { font-size: 16px; margin: 0 0 12px; }
 .cat-date-name { min-width: 140px; font-size: 13px; color: var(--muted); }
 .cat-date-input { flex: 1; max-width: 260px; }
 
+.cal-section .cal-block { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+.cal-section .cal-block .card-head { margin-bottom: 4px; }
+.cal-section .cal-block h2 { font-size: 15px; }
+
 .cal-nav { display: flex; align-items: center; gap: 8px; }
 .cal-label { font-size: 14px; font-weight: 600; min-width: 130px; text-align: center; }
 

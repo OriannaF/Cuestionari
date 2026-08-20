@@ -162,110 +162,88 @@ function loadSource() {
   }
 
   function renderHome() {
-    const st = Quiz.stats();
-    const draft = S().items.length > 0 && !S().results;
-    const failedN = Quiz.failedCount();
-    const pts = st.points;
-    const mode = S().settings.mode;
-    const todayN = Quiz.todayCount();
-    const newN = Quiz.newCount();
-    const ed = Quiz.quizDate();
-    const cats = [...new Set(S().questions.map((q) => q.category || "Sin categoría"))];
-    homeCats = cats;
-    const dateList = [];
-    if (ed) dateList.push({ name: "Cuestionario", iso: ed });
-    cats.forEach((c) => {
-      const iso = Quiz.catDate(c);
-      if (iso) dateList.push({ name: c, iso });
-    });
-    const todayMid = new Date();
-    todayMid.setHours(0, 0, 0, 0);
-    const TODAY = todayMid.toISOString().slice(0, 10);
-    const upcoming = dateList
-      .map((d) => ({ ...d, left: Math.round((new Date(d.iso + "T00:00:00") - todayMid) / 86400000) }))
-      .filter((d) => d.left >= 0)
-      .sort((a, b) => a.left - b.left)[0];
+    const qs = S().questionnaires;
+    document.getElementById("quiz-name").textContent = `${qs.length} cuestionario${qs.length === 1 ? "" : "s"} cargado${qs.length === 1 ? "" : "s"}`;
 
-    document.getElementById("quiz-name").textContent = `${S().name} · ${S().hash}`;
-
-    const catRows = [...st.cats.entries()].map(([name, c]) => {
-      const acc = c.attempts ? Math.round((c.sum / (c.attempts * pts)) * 100) : null;
-      return `<tr><td>${esc(name)}</td><td>${c.count}</td><td>${c.failed}</td><td>${acc === null ? "—" : acc + " %"}</td></tr>`;
-    }).join("");
-
-    const fmtDate = (iso) => {
-      const [y, m, d] = iso.split("-");
-      return `${d}/${m}`;
-    };
-    const modeOptions = [
-      ["today", `Para hoy (${todayN})`],
+    const modeOptions = (st) => [
+      ["today", `Para hoy (${st.today})`],
       ["random", `Aleatorias (${st.total})`],
-      ["new", `Solo nuevas (${newN})`],
-      ["failed", `Solo falladas (${failedN})`],
+      ["new", `Solo nuevas (${st.newN})`],
+      ["failed", `Solo falladas (${st.failedNow})`],
       ["all", `Todas (${st.total})`]
-    ].map(([v, lbl]) => `<option value="${v}" ${mode === v ? "selected" : ""}>${lbl}</option>`).join("");
+    ].map(([v, lbl]) => `<option value="${v}" ${S().settings.mode === v ? "selected" : ""}>${lbl}</option>`).join("");
 
-    const questionnaires = S().questionnaires.map((q, i) => `
-      <option value="${q.hash}" ${S().currentHash === q.hash ? "selected" : ""}>${q.name || `Cuestionario ${i + 1}`}</option>`).join("");
-    const combineOpt = `<option value="all" ${S().currentHash === "all" ? "selected" : ""}>Combinar todos los cuestionarios</option>`;
+    const sizeOptions = (st) => [15, 20, 25, 30, 40, 50, 0].map((n) =>
+      `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n}</option>`).join("");
 
-    const examChip = upcoming
-      ? `<div class="chip ${upcoming.left <= 3 ? "warn" : ""} exam-chip" title="${esc(upcoming.name)}">Parcial: ${upcoming.name === "Cuestionario" ? "" : esc(upcoming.name) + " "}${fmtDate(upcoming.iso)} · ${upcoming.left === 0 ? "¡HOY!" : `faltan ${upcoming.left} día${upcoming.left === 1 ? "" : "s"}`}</div>`
-      : "";
-
-    const questionnaireSelector = S().questionnaires.length > 1 ? `
-      <div class="card accent-card" style="margin: 16px 0;">
+    const sections = qs.map((qq) => {
+      const st = Quiz.statsFor(qq.hash);
+      if (!st) return "";
+      const hasDraft = Quiz.draftOf(qq.hash);
+      return `
+      <div class="card cal-section" id="sec-${st.hash}">
         <div class="card-head">
-          <h2>Cuestionario</h2>
-          <span class="muted small">${S().questionnaires.length} cargados</span>
+          <h2>${esc(st.name)}</h2>
+          <span class="muted small">${st.total} preguntas · ${st.hash}</span>
+        </div>
+        <div class="grid-stats">
+          ${stat("", st.total, "Preguntas")}
+          ${stat("due", st.today, "Para hoy")}
+          ${stat("ok", st.mastered, "Dominadas")}
+          ${stat("bad", st.failed, "Falladas históricas")}
         </div>
         <div class="controls">
-          <select class="input" id="sel-questionnaire">
-            ${combineOpt}
-            ${questionnaires}
-          </select>
+          <label>Fecha de parcial
+            <input class="input" id="inp-exam-${st.hash}" type="date" value="${st.date}">
+          </label>
+          <span class="muted small">Las tarjetas de este cuestionario no se planifican después de esta fecha.</span>
         </div>
-      </div>` : "";
-
-    const catDateInputs = cats.map((c, i) => {
-      const iso = Quiz.catDate(c);
-      return `<div class="cat-date-row">
-        <span class="cat-date-name">${esc(c)}</span>
-        <input class="input cat-date-input" id="inp-cat-exam-${i}" type="date" data-cat="${esc(c)}" value="${iso}" ${iso ? "" : 'style="color:var(--muted)"'}>
-        <button class="btn icon" data-clear="${esc(c)}" title="Quitar fecha del tema">✕</button>
+        ${hasDraft ? `
+        <div class="btn-row align-center">
+          <span class="muted">Tenías una sesión en curso guardada</span>
+          <button class="btn primary" id="btn-resume-${st.hash}">Continuar sesión</button>
+          <button class="btn" id="btn-discard-${st.hash}">Descartar</button>
+        </div>` : ""}
+        <div class="controls">
+          <label>Tipo de sesión
+            <select class="input" id="sel-mode-${st.hash}">${modeOptions(st)}</select>
+          </label>
+          <label>Tope por sesión
+            <select class="input" id="sel-size-${st.hash}">${sizeOptions(st)}</select>
+          </label>
+          <label>Puntos por pregunta
+            <input class="input" id="inp-points-${st.hash}" type="number" min="0.25" step="0.25" value="${S().settings.points}">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary big" id="btn-start-${st.hash}">Empezar sesión de hoy</button>
+          <button class="btn primary" id="btn-start2-${st.hash}">Empezar sesión</button>
+          <button class="btn danger" id="btn-reset-${st.hash}">Reiniciar progreso</button>
+        </div>
+        <div class="cal-block">
+          <div class="card-head">
+            <h2>Calendario de repasos</h2>
+            <div class="cal-nav">
+              <button class="btn icon cal-prev" title="Mes anterior">‹</button>
+              <span class="cal-label">${calLabel()}</span>
+              <button class="btn icon cal-next" title="Mes siguiente">›</button>
+            </div>
+          </div>
+          <div class="cal-grid"></div>
+          <div class="muted small">Hacé clic en un día para ver las preguntas planificadas.</div>
+          <div class="cal-list"></div>
+        </div>
       </div>`;
     }).join("");
 
     view(`
-      <div class="card hero">
-        <div class="hero-today">
-          <div class="hero-num">${todayN}</div>
-          <div class="hero-lbl">para hoy <span class="muted small">(${st.total} en total)</span></div>
-        </div>
-        <div class="hero-mid">
-          <div class="hero-title">Plan del día</div>
-          <div class="muted small">${newN} nuevas · ${Math.max(0, todayN - newN)} repasos vencidos</div>
-          ${examChip}
-        </div>
-        <div class="hero-btn">
-          <button class="btn primary big" id="btn-start">Empezar sesión de hoy</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="grid-stats">
-          ${stat("", st.total, "Preguntas")}
-          ${stat("due", todayN, "Para hoy")}
-          ${stat("ok", st.mastered, "Dominadas")}
-          ${stat("bad", st.failed, "Falladas históricas")}
-        </div>
-      </div>
-      ${draft ? `
+      ${qs.length ? `
         <div class="card accent-card">
-          <div class="btn-row align-center">
-            <span class="muted">Tenías una sesión en curso guardada</span>
-            <button class="btn primary" id="btn-resume">Continuar sesión</button>
-            <button class="btn" id="btn-discard">Descartar</button>
+          <div class="card-head">
+            <h2>Cuestionarios</h2>
+            <span class="muted small">${qs.length} cargados</span>
           </div>
+          <p class="muted small">Cada cuestionario tiene sus propias estadísticas, fecha de parcial y calendario.</p>
         </div>` : ""}
       ${S().warnings.length && !warningsDismissed ? `
         <div class="card warn-card" id="warn-card">
@@ -276,120 +254,77 @@ function loadSource() {
           <p class="muted small">Se cargaron las preguntas válidas. Estas filas se ignoraron:</p>
           <div class="error-list">${S().warnings.map((w) => `<div class="error-item">${esc(w)}</div>`).join("")}</div>
         </div>` : ""}
-      <div class="card">
-        <h2>Fechas de parcial</h2>
-        <div class="controls">
-          <label>Cuestionario
-            <input class="input" id="inp-exam" type="date" value="${ed}">
-          </label>
-          <span class="muted small">Las tarjetas no se planifican después de estas fechas. Cada tema puede tener su propia fecha; si no tiene, usa la del cuestionario.</span>
-        </div>
-        ${catDateInputs ? `<div class="cat-date-list">${catDateInputs}</div>` : ""}
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h2>Calendario de repasos</h2>
-          <div class="cal-nav">
-            <button class="btn icon" id="cal-prev" title="Mes anterior">‹</button>
-            <span class="cal-label" id="cal-label">${calLabel()}</span>
-            <button class="btn icon" id="cal-next" title="Mes siguiente">›</button>
-          </div>
-        </div>
-        <div class="cal-grid" id="cal-grid"></div>
-        <div class="muted small" id="cal-hint">Hacé clic en un día para ver las preguntas planificadas.</div>
-        <div class="cal-list" id="cal-list"></div>
-      </div>
-      <div class="card">
-        <h2>Nueva sesión</h2>
-        <div class="controls">
-          <label>Tipo de sesión
-            <select class="input" id="sel-mode">${modeOptions}</select>
-          </label>
-          <label>Tope por sesión
-            <select class="input" id="sel-size">
-              ${[15, 20, 25, 30, 40, 50, 0].map((n) =>
-                `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n}</option>`).join("")}
-            </select>
-          </label>
-          <label>Puntos por pregunta
-            <input class="input" id="inp-points" type="number" min="0.25" step="0.25" value="${pts}">
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn primary" id="btn-start2">Empezar sesión</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Desempeño por categoría</h2>
-        <table>
-          <thead><tr><th>Categoría</th><th>Preguntas</th><th>Falladas</th><th>Acierto</th></tr></thead>
-          <tbody>${catRows || `<tr><td colspan="4" class="muted">Sin datos todavía</td></tr>`}</tbody>
-        </table>
-      </div>
+      ${sections}
       <div class="card">
         <h2>Cambiar cuestionario</h2>
         <div class="dropzone compact" id="dropzone2">
           <div>Arrastrá otro CSV acá o hacé clic para elegirlo</div>
         </div>
         <input type="file" id="file2" accept=".csv,text/csv,text/plain" hidden>
-        <div class="btn-row">
-          <button class="btn danger" id="btn-reset">Reiniciar progreso</button>
-        </div>
       </div>
     `);
 
     bindUpload("dropzone2", "file2");
-    document.getElementById("btn-start").addEventListener("click", () => { Quiz.setMode("today"); Quiz.newSession(); renderQuiz(); });
-    document.getElementById("btn-start2").addEventListener("click", () => { Quiz.newSession(); renderQuiz(); });
-    document.getElementById("sel-mode").addEventListener("change", (e) => { Quiz.setMode(e.target.value); renderHome(); });
-    document.getElementById("sel-size").addEventListener("change", (e) => Quiz.setSize(e.target.value));
-    document.getElementById("inp-points").addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
-    document.getElementById("sel-questionnaire").addEventListener("change", (e) => {
-      const hash = e.target.value;
-      if (hash === "all") {
-        S.currentHash = "all";
-        // Combine all questions from all questionnaires
-        S.questions = [];
-        S.questionnaires.forEach(q => { S.questions = S.questions.concat(q.questions); });
-        S.name = "Todos los cuestionarios";
-      } else {
-        S.currentHash = hash;
-        const current = S.questionnaires.find(q => q.hash === hash);
-        if (current) {
-          S.questions = current.questions;
-          S.name = current.name;
+    qs.forEach((qq) => {
+      const h = qq.hash;
+      const sec = document.getElementById("sec-" + h);
+      if (!sec) return;
+      document.getElementById("btn-start-" + h).addEventListener("click", () => {
+        Quiz.selectQuestionnaire(h);
+        Quiz.setMode("today");
+        Quiz.newSession();
+        renderQuiz();
+      });
+      document.getElementById("btn-start2-" + h).addEventListener("click", () => {
+        Quiz.selectQuestionnaire(h);
+        Quiz.newSession();
+        renderQuiz();
+      });
+      document.getElementById("sel-mode-" + h).addEventListener("change", (e) => { Quiz.setMode(e.target.value); renderHome(); });
+      document.getElementById("sel-size-" + h).addEventListener("change", (e) => Quiz.setSize(e.target.value));
+      document.getElementById("inp-points-" + h).addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
+      document.getElementById("inp-exam-" + h).addEventListener("change", (e) => { Quiz.setExamDateFor(h, e.target.value); renderHome(); });
+      document.getElementById("btn-reset-" + h).addEventListener("click", () => {
+        if (confirm(`¿Reiniciar todo el progreso de "${qq.name}"?`)) {
+          Quiz.resetProgressFor(h);
+          renderHome();
+          toast("Progreso reiniciado");
         }
-      }
-      renderHome();
-    });
-    document.getElementById("inp-exam").addEventListener("change", (e) => { Quiz.setExamDate(e.target.value); renderHome(); });
-    document.querySelectorAll(".cat-date-input").forEach((inp) => {
-      inp.addEventListener("change", (e) => { Quiz.setCatExamDate(e.target.dataset.cat, e.target.value); renderHome(); });
-    });
-    document.querySelectorAll("[data-clear]").forEach((btn) => {
-      btn.addEventListener("click", () => { Quiz.setCatExamDate(btn.dataset.clear, ""); renderHome(); });
-    });
-    bindCalendar();
-    document.getElementById("btn-reset").addEventListener("click", () => {
-      if (confirm("¿Reiniciar todo el progreso de este cuestionario?")) {
-        Quiz.resetProgress();
+      });
+      const resumeBtn = document.getElementById("btn-resume-" + h);
+      if (resumeBtn) resumeBtn.addEventListener("click", () => {
+        Quiz.selectQuestionnaire(h);
+        if (Quiz.tryResume()) renderQuiz();
+        else { S().items = []; renderHome(); }
+      });
+      const discardBtn = document.getElementById("btn-discard-" + h);
+      if (discardBtn) discardBtn.addEventListener("click", () => {
+        Quiz.selectQuestionnaire(h);
+        S().items = [];
+        S().results = null;
         renderHome();
-        toast("Progreso reiniciado");
-      }
+      });
+      const prevBtn = sec.querySelector(".cal-prev");
+      if (prevBtn) prevBtn.addEventListener("click", () => {
+        calNow();
+        calMonth--;
+        if (calMonth < 0) { calMonth = 11; calYear--; }
+        renderAllCals();
+      });
+      const nextBtn = sec.querySelector(".cal-next");
+      if (nextBtn) nextBtn.addEventListener("click", () => {
+        calNow();
+        calMonth++;
+        if (calMonth > 11) { calMonth = 0; calYear++; }
+        renderAllCals();
+      });
+      renderCalFor(h);
     });
     const warnClose = document.getElementById("btn-warn-close");
     if (warnClose) warnClose.addEventListener("click", () => { warningsDismissed = true; renderHome(); });
-    const resumeBtn = document.getElementById("btn-resume");
-    if (resumeBtn) resumeBtn.addEventListener("click", () => {
-      if (Quiz.tryResume()) renderQuiz();
-      else { S().items = []; renderHome(); }
-    });
-    const discardBtn = document.getElementById("btn-discard");
-    if (discardBtn) discardBtn.addEventListener("click", () => { S().items = []; S().results = null; renderHome(); });
   }
 
   let calYear = 0, calMonth = -1;
-  let homeCats = [];
   const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const DAY_LETTERS = ["L", "M", "X", "J", "V", "S", "D"];
   const isoOf = (y, m, d) => new Date(y, m, d, 12).toISOString().slice(0, 10);
@@ -408,25 +343,16 @@ function loadSource() {
 
   const calLabel = () => { calNow(); return `${MONTHS[calMonth]} ${calYear}`; };
 
-  function examDaysOf() {
-    const m = {};
-    const qd = Quiz.quizDate();
-    if (qd) m[qd] = "Cuestionario";
-    for (const c of homeCats) {
-      const iso = Quiz.catDate(c);
-      if (iso) m[iso] = c;
-    }
-    return m;
-  }
-
-  function renderCal() {
-    calNow();
-    const grid = document.getElementById("cal-grid");
-    const label = document.getElementById("cal-label");
+  function renderCalFor(hash) {
+    const sec = document.getElementById("sec-" + hash);
+    if (!sec) return;
+    const grid = sec.querySelector(".cal-grid");
+    const label = sec.querySelector(".cal-label");
+    const list = sec.querySelector(".cal-list");
     if (!grid) return;
-    if (label) label.textContent = calLabel();
-    const by = Quiz.scheduledByDay();
-    const examDays = examDaysOf();
+    label.textContent = calLabel();
+    const by = Quiz.scheduledByDayFor(hash);
+    const examIso = Quiz.examDateFor(hash);
     const first = new Date(calYear, calMonth, 1);
     const offset = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -437,58 +363,34 @@ function loadSource() {
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = isoOf(calYear, calMonth, d);
       const n = (by[iso] || []).length;
-      const exam = examDays[iso];
+      const exam = iso === examIso;
       const cls = [iso === todayIso ? "today" : "", n ? "has-plan" : "", exam ? "cal-exam" : ""].join(" ");
       cells += `<div class="cal-day ${cls}" data-iso="${iso}" ${n ? `title="${n} pregunta${n === 1 ? "" : "s"}"` : ""}>
         <span class="cal-day-num">${d}</span>
         ${n ? `<span class="cal-pill">${n}</span>` : ""}
-        ${exam ? `<span class="cal-dot" title="Parcial: ${esc(exam)}"></span>` : ""}
+        ${exam ? `<span class="cal-dot" title="Parcial"></span>` : ""}
       </div>`;
     }
     grid.innerHTML = cells;
     grid.querySelectorAll(".cal-day.has-plan").forEach((cell) => {
-      cell.addEventListener("click", () => showCalDay(cell.dataset.iso, cell));
+      cell.addEventListener("click", () => {
+        sec.querySelectorAll(".cal-day.selected").forEach((c) => c.classList.remove("selected"));
+        cell.classList.add("selected");
+        const qs = Quiz.questionsOnDayFor(hash, cell.dataset.iso);
+        list.innerHTML = `
+          <div class="cal-list-title">${fmtIso(cell.dataset.iso)} — ${qs.length} pregunta${qs.length === 1 ? "" : "s"}</div>
+          ${qs.length ? qs.map((q, i) => `
+            <div class="cal-list-item">
+              <span class="cal-item-num">${i + 1}</span>
+              <span class="cal-item-text">${esc(q.text)}</span>
+            </div>`).join("")
+            : `<div class="muted small">Sin preguntas planificadas para ese día.</div>`}`;
+      });
     });
   }
 
-  function showCalDay(iso, cell) {
-    const list = document.getElementById("cal-list");
-    document.querySelectorAll(".cal-day.selected").forEach((c) => c.classList.remove("selected"));
-    if (!list) return;
-    if (!iso) { list.innerHTML = ""; return; }
-    if (cell) cell.classList.add("selected");
-    const qs = Quiz.questionsOnDay(iso);
-    const exam = examDaysOf()[iso];
-    list.innerHTML = `
-      <div class="cal-list-title">${fmtIso(iso)}${exam ? ` · Parcial: ${esc(exam)}` : ""} — ${qs.length} pregunta${qs.length === 1 ? "" : "s"}</div>
-      ${qs.length ? qs.map((q, i) => `
-        <div class="cal-list-item">
-          <span class="cal-item-num">${i + 1}</span>
-          <span class="cal-item-text">${esc(q.text)}</span>
-          ${q.category ? `<span class="chip">${esc(q.category)}</span>` : ""}
-        </div>`).join("")
-        : `<div class="muted small">Sin preguntas planificadas para ese día.</div>`}`;
-  }
-
-  function bindCalendar() {
-    const prev = document.getElementById("cal-prev");
-    const next = document.getElementById("cal-next");
-    if (!prev) return;
-    prev.addEventListener("click", () => {
-      calNow();
-      calMonth--;
-      if (calMonth < 0) { calMonth = 11; calYear--; }
-      renderCal();
-      showCalDay(null, null);
-    });
-    next.addEventListener("click", () => {
-      calNow();
-      calMonth++;
-      if (calMonth > 11) { calMonth = 0; calYear++; }
-      renderCal();
-      showCalDay(null, null);
-    });
-    renderCal();
+  function renderAllCals() {
+    S().questionnaires.forEach((q) => renderCalFor(q.hash));
   }
 
   function renderQuiz() {

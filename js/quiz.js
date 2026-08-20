@@ -387,11 +387,100 @@ const Quiz = (() => {
     return ids.map((id) => S.questions[id]).filter(Boolean);
   }
 
+  function selectQuestionnaire(hash) {
+    if (hash === "all") {
+      S.currentHash = "all";
+      S.questions = [];
+      S.questionnaires.forEach(q => { S.questions = S.questions.concat(q.questions); });
+      S.name = "Todos los cuestionarios";
+      S.progress = {};
+      return true;
+    }
+    const q = S.questionnaires.find(x => x.hash === hash);
+    if (!q) return false;
+    S.currentHash = hash;
+    S.questions = q.questions;
+    S.name = q.name;
+    S.progress = Store.loadProgress(hash);
+    loadExamDates();
+    return true;
+  }
+
+  function examDateFor(hash) {
+    const ed = Store.loadExamDates(hash);
+    return (ed && typeof ed === "object" && validDate(ed.date)) ? ed.date : "";
+  }
+
+  function setExamDateFor(hash, iso) {
+    const ed = Store.loadExamDates(hash) || {};
+    const cats = (ed.cats && typeof ed.cats === "object") ? ed.cats : {};
+    Store.saveExamDates(hash, { date: validDate(iso), cats });
+    if ((S.currentHash || S.hash) === hash) {
+      S.examDates.date = validDate(iso);
+      S.examDates.cats = cats;
+    }
+  }
+
+  function statsFor(hash) {
+    const q = S.questionnaires.find(x => x.hash === hash);
+    if (!q) return null;
+    const progress = Store.loadProgress(hash);
+    const pts = S.settings.points;
+    const t = Sched.startOfDay();
+    let today = 0, newN = 0, mastered = 0, failed = 0, failedNow = 0;
+    for (const qq of q.questions) {
+      const c = progress[qq.id];
+      if (!c || !c.due || Sched.isDue(c, t)) today++;
+      if (!c) newN++;
+      if (c && c.reps >= 3) mastered++;
+      if (c && c.fails > 0) failed++;
+      if (c && c.last !== undefined && c.last < pts - 1e-9) failedNow++;
+    }
+    return { hash, name: q.name, total: q.questions.length, today, newN, mastered, failed, failedNow, date: examDateFor(hash) };
+  }
+
+  function draftOf(hash) {
+    const d = Store.loadDraft(hash);
+    return !!(d && Array.isArray(d.items) && d.items.length);
+  }
+
+  function resetProgressFor(hash) {
+    Store.resetProgress(hash);
+    Store.clearDraft(hash);
+    if ((S.currentHash || S.hash) === hash) {
+      S.progress = {};
+      S.items = [];
+      S.answers = {};
+      S.results = null;
+    }
+  }
+
+  function scheduledByDayFor(hash) {
+    const progress = Store.loadProgress(hash);
+    const by = {};
+    for (const [id, c] of Object.entries(progress)) {
+      if (c && c.due) {
+        const k = String(c.due).slice(0, 10);
+        (by[k] = by[k] || []).push(parseInt(id, 10));
+      }
+    }
+    return by;
+  }
+
+  function questionsOnDayFor(hash, iso) {
+    const q = S.questionnaires.find(x => x.hash === hash);
+    if (!q) return [];
+    const ids = scheduledByDayFor(hash)[String(iso).slice(0, 10)] || [];
+    return ids.map(id => q.questions[id]).filter(Boolean);
+  }
+
   return {
     S, loadCsv, tryLoadSaved, newSession, repeatSession, failedSession, toggle, setSlot, setFill,
     isAnswered, answeredCount, submit, tryResume, resetProgress,
     persistSettings, setSize, setPoints, setMode, setExamDate, setCatExamDate, quizDate, catDate,
-    stats, failedCount, todayCount, newCount, scheduledByDay, questionsOnDay, scoreQuestion
+    stats, failedCount, todayCount, newCount, scheduledByDay, questionsOnDay, scoreQuestion,
+    selectQuestionnaire, examDateFor, setExamDateFor, statsFor, draftOf, resetProgressFor,
+    scheduledByDayFor, questionsOnDayFor
   };
 })();
 
