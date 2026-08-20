@@ -50,55 +50,41 @@
   const BUNDLED_NAME = "Final ADS";
 
 function loadSource() {
-    return Promise.all([
-      fetch("data/cuestionario.csv")
+    const loadOne = (url, name) =>
+      fetch(url)
         .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
         .then((txt) => {
-          if (!txt.trim()) return Quiz.tryLoadSaved();
-          const res = Quiz.loadCsv(txt, "Final ADS");
-          if (res.ok) return true;
-          throw res;
-        }),
-      fetch("data/cuestionario Borboleto.csv")
-        .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
-        .then((txt) => {
-          if (!txt.trim()) return Quiz.tryLoadSaved();
-          const res = Quiz.loadCsv(txt, "Borboleto");
-          if (res.ok) return true;
-          throw res;
+          if (!txt.trim()) return { ok: false, skipped: true };
+          const res = Quiz.loadCsv(txt, name);
+          return res.ok ? { ok: true } : { ok: false, errors: res.errors };
         })
+        .catch(() => ({ ok: false, skipped: true }));
+
+    return Promise.all([
+      loadOne("data/cuestionario.csv", "Final ADS"),
+      loadOne("data/cuestionario Borboleto.csv", "Borboleto")
     ]).then(([r1, r2]) => {
-      if (r1 === true) {
-        warningsDismissed = false;
-        renderHome();
-        toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
-      } else if (r1 && r1.errors) {
-        renderLoadError(r1.errors);
-      } else if (r2 && r2.ok) {
-        // Second CSV loaded successfully
-        warningsDismissed = false;
-        renderHome();
-        toast(`Cuestionarios cargados: ${S().questionnaires.length} (${S().questionnaires.map(q => q.name).join(", ")})`);
-      } else if (r2 && r2.errors) {
-        renderLoadError(r2.errors);
-      } else {
-        renderUpload();
-      }
-    }).catch((err) => {
-      if (err && err.errors) return err;
-      return Quiz.tryLoadSaved();
-    });
-  }
+      if (S().questionnaires.length > 0) return { ok: true, loaded: true };
+      if (r1.errors) return { ok: false, errors: r1.errors };
+      if (r2.errors) return { ok: false, errors: r2.errors };
+      return Quiz.tryLoadSaved()
+        ? { ok: true, loaded: true }
+        : { ok: true, loaded: false };
     });
   }
 
   function init() {
     loadSource().then((r) => {
-      if (r === true) {
+      if (r.loaded) {
         warningsDismissed = false;
         renderHome();
-        toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
-      } else if (r && r.errors) {
+        if (S().questionnaires.length > 1) {
+          const names = S().questionnaires.map(q => q.name).join(", ");
+          toast(`Cuestionarios cargados: ${S().questionnaires.length} (${names})`);
+        } else {
+          toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
+        }
+      } else if (r.errors) {
         renderLoadError(r.errors);
       } else {
         renderUpload();
