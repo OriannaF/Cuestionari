@@ -8,7 +8,8 @@ const Store = hasWindow ? window.QuizStore : require("./storage.js");
 
 const Quiz = (() => {
   const S = {
-    questions: [],
+    questionnaires: [], // array of {hash, name, questions}
+    currentHash: "",
     progress: {},
     settings: { size: 20, points: 1 },
     hash: "",
@@ -58,7 +59,8 @@ const Quiz = (() => {
   const validDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00").getTime()) ? v : "";
 
   function loadExamDates() {
-    const saved = Store.loadExamDates(S.hash);
+    const hash = S.currentHash || S.hash;
+    const saved = Store.loadExamDates(hash);
     const ex = saved && typeof saved === "object" ? saved : {};
     S.examDates = {
       date: validDate(ex.date),
@@ -80,7 +82,8 @@ const Quiz = (() => {
   }
 
   function saveExamDates() {
-    Store.saveExamDates(S.hash, S.examDates);
+    const hash = S.currentHash || S.hash;
+    Store.saveExamDates(hash, S.examDates);
   }
 
   const quizDate = () => S.examDates.date || "";
@@ -93,18 +96,35 @@ const Quiz = (() => {
   function loadCsv(text, name) {
     const res = CSV.parseQuestions(text);
     if (!res.ok) return res;
-    S.sourceText = text;
-    S.hash = Store.hash(text);
-    S.name = name || "Cuestionario";
-    S.questions = res.questions;
+    const hash = Store.hash(text);
+    // Check if this CSV is already loaded (by hash)
+    const existing = S.questionnaires.find(q => q.hash === hash);
+    if (existing) {
+      // Already loaded, just set as current
+      S.currentHash = hash;
+    } else {
+      // New CSV, add to list
+      S.questionnaires.push({
+        hash,
+        name: name || "Cuestionario",
+        questions: res.questions
+      });
+      S.currentHash = hash;
+    }
+    // Find the current questionnaire's data
+    const current = S.questionnaires.find(q => q.hash === S.currentHash);
+    if (current) {
+      S.questions = current.questions;
+      S.name = current.name;
+    }
     S.warnings = res.warnings || [];
-    S.progress = Store.loadProgress(S.hash);
+    S.progress = Store.loadProgress(S.currentHash);
     S.items = [];
     S.answers = {};
     S.results = null;
     loadSettings();
     loadExamDates();
-    Store.saveLastCsv({ text, name });
+    Store.saveLastCsv({ text, name, hash });
     return res;
   }
 
@@ -113,6 +133,17 @@ const Quiz = (() => {
     if (!saved || !String(saved.text || "").trim()) return false;
     if (!CSV.parseQuestions(saved.text).ok) return false;
     loadCsv(saved.text, saved.name || "Cuestionario guardado");
+    // Also load its exam dates if stored
+    const current = S.questionnaires.find(q => q.hash === S.currentHash);
+    if (current && saved.hash) {
+      const savedDates = Store.loadExamDates(saved.hash);
+      if (savedDates && typeof savedDates === "object") {
+        S.examDates = {
+          date: savedDates.date || S.examDates.date,
+          cats: { ...(S.examDates.cats || {}), ...savedDates.cats }
+        };
+      }
+    }
     return true;
   }
 
@@ -136,16 +167,18 @@ const Quiz = (() => {
   }
 
   function setExamDate(iso) {
+    const hash = S.currentHash || S.hash;
     S.examDates.date = validDate(iso);
-    saveExamDates();
+    saveExamDates(hash);
   }
 
   function setCatExamDate(cat, iso) {
+    const hash = S.currentHash || S.hash;
     const c = String(cat || "").trim() || "Sin categoría";
     const v = validDate(iso);
     if (v) S.examDates.cats[c] = v;
     else delete S.examDates.cats[c];
-    saveExamDates();
+    saveExamDates(hash);
   }
 
   function setPoints(p) {
@@ -161,7 +194,14 @@ const Quiz = (() => {
   }
 
   function newSession() {
-    buildFrom(() => Sched.buildByMode(S.questions, S.progress, S.settings.mode, S.settings.size, undefined, S.settings.points));
+    let questions = [];
+    if (S.currentHash === "all") {
+      S.questionnaires.forEach(q => { questions = questions.concat(q.questions); });
+    } else {
+      const current = S.questionnaires.find(q => q.hash === S.currentHash);
+      if (current) questions = current.questions;
+    }
+    buildFrom(() => Sched.buildByMode(questions, S.progress, S.settings.mode, S.settings.size, undefined, S.settings.points));
   }
 
   function repeatSession(lastIds) {
@@ -244,20 +284,23 @@ const Quiz = (() => {
       return { q, optOrder: it.optOrder, dispChecked, origChecked, score, state };
     });
     S.results = { detail, total, max: S.items.length * pts, pts, marked };
-    Store.saveProgress(S.hash, S.progress);
-    Store.clearDraft(S.hash);
+    const hash = S.currentHash || S.hash;
+    Store.saveProgress(hash, S.progress);
+    Store.clearDraft(hash);
     return S.results;
   }
 
   function saveDraft() {
-    Store.saveDraft(S.hash, {
+    const hash = S.currentHash || S.hash;
+    Store.saveDraft(hash, {
       items: S.items.map((it) => ({ idx: it.q.id, order: it.optOrder })),
       answers: S.answers
     });
   }
 
   function tryResume() {
-    const d = Store.loadDraft(S.hash);
+    const hash = S.currentHash || S.hash;
+    const d = Store.loadDraft(hash);
     if (!d || !Array.isArray(d.items)) return false;
     const items = [];
     for (const m of d.items) {
@@ -275,8 +318,9 @@ const Quiz = (() => {
   }
 
   function resetProgress() {
-    Store.resetProgress(S.hash);
-    Store.clearDraft(S.hash);
+    const hash = S.currentHash || S.hash;
+    Store.resetProgress(hash);
+    Store.clearDraft(hash);
     S.progress = {};
     S.items = [];
     S.answers = {};

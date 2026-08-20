@@ -154,16 +154,31 @@ const CSV = (() => {
         }
       }
 
-      if (isFill) {
+      const rawC = String(row[ci] || "").trim();
+      const numericC = rawC ? rawC.split(/[;|,]/).every((t) => t.trim() === "" || Number.isFinite(parseInt(t.trim(), 10))) : false;
+      const rowOptions = [];
+      for (let c = qi + 1; c < ci && c < row.length; c++) {
+        if (c === cati || c === expi || c === oi) continue;
+        const v = String(row[c] || "").trim();
+        if (v) rowOptions.push(v);
+      }
+      const hasOneOption = rowOptions.length === 1;
+      const textFill = !isDropdown && !isFill && rowOptions.length === 0 && !numericC;
+
+      if (isFill || textFill || (hasOneOption && !isDropdown)) {
+        let correctVal = "";
+        if (hasOneOption && !isDropdown) {
+          correctVal = rowOptions[0];
+        }
         const raw = String(row[ci] || "").trim();
         const accepted = raw ? raw.split(/[;|]/).map((t) => t.trim()).filter(Boolean) : [];
         const seen = new Set();
-        const clean = accepted.filter((t) => {
+        const clean = accepted.length ? accepted.filter((t) => {
           const n = normText(t);
           if (!n || seen.has(n)) return false;
           seen.add(n);
           return true;
-        });
+        }) : [normText(correctVal)];
         if (!clean.length) {
           warnings.push(`Fila ${line}: la columna 'correctas' necesita al menos una respuesta correcta como texto. Se omitió.`);
           continue;
@@ -180,12 +195,7 @@ const CSV = (() => {
         continue;
       }
 
-      const options = [];
-      for (let c = qi + 1; c < ci && c < row.length; c++) {
-        if (c === cati || c === expi || c === oi) continue;
-        const v = String(row[c] || "").trim();
-        if (v) options.push(v);
-      }
+      const options = rowOptions;
       if (options.length < 2) rowErrors.push(`se necesitan al menos 2 opciones (se encontraron ${options.length})`);
       else if (options.length > 8) rowErrors.push(`máximo 8 opciones por pregunta (se encontraron ${options.length})`);
 

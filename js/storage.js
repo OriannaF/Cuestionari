@@ -43,8 +43,8 @@ const QuizStore = (() => {
   function saveDraft(h, d) { set("quiz.draft." + h, d); }
   function clearDraft(h) { remove("quiz.draft." + h); }
 
-  function loadLastCsv() { return get("quiz.csv.last", null); }
-  function saveLastCsv(v) { set("quiz.csv.last", v); }
+  function loadLastCsv() { return get("quiz.csv.loaded", null); }
+  function saveLastCsv(v) { set("quiz.csv.loaded", v); }
 
   function loadExamDates(h) { return get("quiz.examdates." + h, null); }
   function saveExamDates(h, d) { set("quiz.examdates." + h, d); }

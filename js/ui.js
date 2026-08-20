@@ -50,18 +50,34 @@
   const BUNDLED_NAME = "Final ADS";
 
   function loadSource() {
-    return fetch("data/cuestionario.csv")
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
-      .then((txt) => {
-        if (!txt.trim()) return Quiz.tryLoadSaved();
-        const res = Quiz.loadCsv(txt, BUNDLED_NAME);
-        if (res.ok) return true;
-        throw res;
-      })
-      .catch((err) => {
-        if (err && err.errors) return err;
-        return Quiz.tryLoadSaved();
-      });
+    return Promise.all([
+      fetch("data/cuestionario.csv")
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
+        .then((txt) => {
+          if (!txt.trim()) return Quiz.tryLoadSaved();
+          const res = Quiz.loadCsv(txt, "Final ADS");
+          if (res.ok) return true;
+          throw res;
+        }),
+      fetch("data/cuestionario_original.csv")
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no file"))))
+        .then((txt) => {
+          if (!txt.trim()) return;
+          const res = Quiz.loadCsv(txt, "Final ADS - Original");
+          if (res.ok) return;
+          throw res;
+        })
+    ]).then(([r1, r2]) => {
+      if (r1 === true) {
+        warningsDismissed = false;
+        renderHome();
+        toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
+      } else if (r1 && r1.errors) {
+        renderLoadError(r1.errors);
+      } else {
+        renderUpload();
+      }
+    });
   }
 
   function init() {
@@ -191,9 +207,27 @@
       ["all", `Todas (${st.total})`]
     ].map(([v, lbl]) => `<option value="${v}" ${mode === v ? "selected" : ""}>${lbl}</option>`).join("");
 
+    const questionnaires = S().questionnaires.map((q, i) => `
+      <option value="${q.hash}" ${S().currentHash === q.hash ? "selected" : ""}>${q.name || `Cuestionario ${i + 1}`}</option>`).join("");
+    const combineOpt = `<option value="all" ${S().currentHash === "all" ? "selected" : ""}>Combinar todos los cuestionarios</option>`;
+
     const examChip = upcoming
       ? `<div class="chip ${upcoming.left <= 3 ? "warn" : ""} exam-chip" title="${esc(upcoming.name)}">Parcial: ${upcoming.name === "Cuestionario" ? "" : esc(upcoming.name) + " "}${fmtDate(upcoming.iso)} · ${upcoming.left === 0 ? "¡HOY!" : `faltan ${upcoming.left} día${upcoming.left === 1 ? "" : "s"}`}</div>`
       : "";
+
+    const questionnaireSelector = S().questionnaires.length > 1 ? `
+      <div class="card accent-card" style="margin: 16px 0;">
+        <div class="card-head">
+          <h2>Cuestionario</h2>
+          <span class="muted small">${S().questionnaires.length} cargados</span>
+        </div>
+        <div class="controls">
+          <select class="input" id="sel-questionnaire">
+            ${combineOpt}
+            ${questionnaires}
+          </select>
+        </div>
+      </div>` : "";
 
     const catDateInputs = cats.map((c, i) => {
       const iso = Quiz.catDate(c);
@@ -312,6 +346,24 @@
     document.getElementById("sel-mode").addEventListener("change", (e) => { Quiz.setMode(e.target.value); renderHome(); });
     document.getElementById("sel-size").addEventListener("change", (e) => Quiz.setSize(e.target.value));
     document.getElementById("inp-points").addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
+    document.getElementById("sel-questionnaire").addEventListener("change", (e) => {
+      const hash = e.target.value;
+      if (hash === "all") {
+        S.currentHash = "all";
+        // Combine all questions from all questionnaires
+        S.questions = [];
+        S.questionnaires.forEach(q => { S.questions = S.questions.concat(q.questions); });
+        S.name = "Todos los cuestionarios";
+      } else {
+        S.currentHash = hash;
+        const current = S.questionnaires.find(q => q.hash === hash);
+        if (current) {
+          S.questions = current.questions;
+          S.name = current.name;
+        }
+      }
+      renderHome();
+    });
     document.getElementById("inp-exam").addEventListener("change", (e) => { Quiz.setExamDate(e.target.value); renderHome(); });
     document.querySelectorAll(".cat-date-input").forEach((inp) => {
       inp.addEventListener("change", (e) => { Quiz.setCatExamDate(e.target.dataset.cat, e.target.value); renderHome(); });
