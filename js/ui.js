@@ -74,6 +74,13 @@ function loadSource() {
   }
 
   function init() {
+    const tt = document.getElementById("theme-toggle");
+    if (tt) tt.addEventListener("click", () => {
+      const el = document.documentElement;
+      const dark = el.classList.toggle("dark");
+      el.classList.toggle("light", !dark);
+      try { localStorage.setItem("quiz.theme", dark ? "dark" : "light"); } catch (e) {}
+    });
     loadSource().then((r) => {
       if (r.loaded) {
         warningsDismissed = false;
@@ -161,9 +168,15 @@ function loadSource() {
     });
   }
 
+  const EXAM_ICONS = ["school", "menu_book", "science", "calculate", "account_balance", "psychology", "biotech", "public"];
+
   function renderHome() {
     const qs = S().questionnaires;
     document.getElementById("quiz-name").textContent = `${qs.length} cuestionario${qs.length === 1 ? "" : "s"} cargado${qs.length === 1 ? "" : "s"}`;
+
+    const stats = qs.map((qq) => Quiz.statsFor(qq.hash)).filter(Boolean);
+    const agg = { total: 0, today: 0, mastered: 0, failed: 0 };
+    stats.forEach((st) => { agg.total += st.total; agg.today += st.today; agg.mastered += st.mastered; agg.failed += st.failed; });
 
     const modeOptions = (st) => [
       ["today", `Para hoy (${st.today})`],
@@ -173,79 +186,103 @@ function loadSource() {
       ["all", `Todas (${st.total})`]
     ].map(([v, lbl]) => `<option value="${v}" ${S().settings.mode === v ? "selected" : ""}>${lbl}</option>`).join("");
 
-    const sizeOptions = (st) => [15, 20, 25, 30, 40, 50, 0].map((n) =>
-      `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n}</option>`).join("");
+    const sizeOptions = (st) => [10, 15, 20, 25, 30, 40, 50, 0].map((n) =>
+      `<option value="${n}" ${S().settings.size === n ? "selected" : ""}>${n === 0 ? `Todas (${Math.min(1000, st.total)})` : n} preguntas</option>`).join("");
 
-    const sections = qs.map((qq) => {
-      const st = Quiz.statsFor(qq.hash);
+    const examCards = qs.map((qq, i) => {
+      const st = stats.find((s) => s.hash === qq.hash);
       if (!st) return "";
+      const icon = EXAM_ICONS[i % EXAM_ICONS.length];
       const hasDraft = Quiz.draftOf(qq.hash);
       return `
-      <div class="card cal-section" id="sec-${st.hash}">
-        <div class="card-head">
-          <h2>${esc(st.name)}</h2>
-          <span class="muted small">${st.total} preguntas · ${st.hash}</span>
-        </div>
-        <div class="grid-stats">
-          ${stat("", st.total, "Preguntas")}
-          ${stat("due", st.today, "Para hoy")}
-          ${stat("ok", st.mastered, "Dominadas")}
-          ${stat("bad", st.failed, "Falladas históricas")}
-        </div>
-        <div class="controls">
-          <label>Fecha de parcial
-            <input class="input" id="inp-exam-${st.hash}" type="date" value="${st.date}">
-          </label>
-          <span class="muted small">Las tarjetas de este cuestionario no se planifican después de esta fecha.</span>
-        </div>
-        ${hasDraft ? `
-        <div class="btn-row align-center">
-          <span class="muted">Tenías una sesión en curso guardada</span>
-          <button class="btn primary" id="btn-resume-${st.hash}">Continuar sesión</button>
-          <button class="btn" id="btn-discard-${st.hash}">Descartar</button>
-        </div>` : ""}
-        <div class="controls">
-          <label>Tipo de sesión
-            <select class="input" id="sel-mode-${st.hash}">${modeOptions(st)}</select>
-          </label>
-          <label>Tope por sesión
-            <select class="input" id="sel-size-${st.hash}">${sizeOptions(st)}</select>
-          </label>
-          <label>Puntos por pregunta
-            <input class="input" id="inp-points-${st.hash}" type="number" min="0.25" step="0.25" value="${S().settings.points}">
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn primary big" id="btn-start-${st.hash}">Empezar sesión de hoy</button>
-          <button class="btn primary" id="btn-start2-${st.hash}">Empezar sesión</button>
-          <button class="btn danger" id="btn-reset-${st.hash}">Reiniciar progreso</button>
-        </div>
-        <div class="cal-block">
-          <div class="card-head">
-            <h2>Calendario de repasos</h2>
-            <div class="cal-nav">
-              <button class="btn icon cal-prev" title="Mes anterior">‹</button>
-              <span class="cal-label">${calLabel()}</span>
-              <button class="btn icon cal-next" title="Mes siguiente">›</button>
-            </div>
+      <div class="exam-card">
+        <div class="exam-card-icon"><span class="material-symbols-outlined">${icon}</span></div>
+        <div class="exam-card-body">
+          <h3>${esc(st.name)}</h3>
+          <div class="exam-card-meta">
+            <span><b>${st.total}</b> preguntas</span><span>·</span>
+            <span><b>${st.today}</b> para hoy</span><span>·</span>
+            <span><b>${st.mastered}</b> dominadas</span>
           </div>
-          <div class="cal-grid"></div>
-          <div class="muted small">Hacé clic en un día para ver las preguntas planificadas.</div>
-          <div class="cal-list"></div>
+          ${hasDraft ? `
+          <button class="draft-chip" id="btn-resume-${st.hash}">
+            <span class="material-symbols-outlined">history</span>
+            Continuar sesión guardada
+          </button>` : ""}
+          <label class="field-label" for="sel-size-${st.hash}">Cantidad de preguntas</label>
+          <select class="input" id="sel-size-${st.hash}">${sizeOptions(st)}</select>
+          <label class="field-label" for="sel-mode-${st.hash}">Tipo de sesión</label>
+          <select class="input" id="sel-mode-${st.hash}">${modeOptions(st)}</select>
+          <button class="btn primary block big" id="btn-start-${st.hash}">
+            Comenzar <span class="material-symbols-outlined">arrow_forward</span>
+          </button>
         </div>
       </div>`;
     }).join("");
 
-    view(`
-      ${qs.length ? `
-        <div class="card accent-card">
-          <div class="card-head">
-            <h2>Cuestionarios</h2>
-            <span class="muted small">${qs.length} cargados</span>
+    const manageCards = qs.map((qq) => {
+      const st = stats.find((s) => s.hash === qq.hash);
+      if (!st) return "";
+      return `
+      <details class="card manage-card" id="sec-${st.hash}">
+        <summary>
+          <span class="material-symbols-outlined" style="color:var(--accent)">tune</span>
+          ${esc(st.name)}
+          <span class="muted small" style="font-weight:400">fecha de parcial, calendario y progreso</span>
+          <span class="material-symbols-outlined summary-chev">expand_more</span>
+        </summary>
+        <div class="manage-body">
+          <div class="controls">
+            <label>Fecha de parcial
+              <input class="input" id="inp-exam-${st.hash}" type="date" value="${st.date}">
+            </label>
+            <label>Puntos por pregunta
+              <input class="input" id="inp-points-${st.hash}" type="number" min="0.25" step="0.25" value="${S().settings.points}">
+            </label>
+            <button class="btn danger sm" id="btn-reset-${st.hash}">Reiniciar progreso</button>
           </div>
-          <p class="muted small">Cada cuestionario tiene sus propias estadísticas, fecha de parcial y calendario.</p>
-        </div>` : ""}
+          <p class="muted small">Las tarjetas de este cuestionario no se planifican después de su fecha de parcial.</p>
+          <div class="cal-block">
+            <div class="card-head">
+              <h2 style="font-size:16px">Calendario de repasos</h2>
+              <div class="cal-nav">
+                <button class="btn icon cal-prev" title="Mes anterior">‹</button>
+                <span class="cal-label">${calLabel()}</span>
+                <button class="btn icon cal-next" title="Mes siguiente">›</button>
+              </div>
+            </div>
+            <div class="cal-grid"></div>
+            <div class="muted small">Hacé clic en un día para ver las preguntas planificadas.</div>
+            <div class="cal-list"></div>
+          </div>
+        </div>
+      </details>`;
+    }).join("");
+
+    view(`
+      <section class="home-section">
+        <h1 class="page-title">Progreso</h1>
+        <div class="stat-cards">
+          <div class="stat-card">
+            <div class="stat-ic"><span class="material-symbols-outlined">trending_up</span></div>
+            <div><p class="lbl">Preguntas totales</p><p class="big">${agg.total}</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ic amber"><span class="material-symbols-outlined">timer</span></div>
+            <div><p class="lbl">Para hoy</p><p class="big">${agg.today}</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ic green"><span class="material-symbols-outlined">task_alt</span></div>
+            <div><p class="lbl">Dominadas</p><p class="big">${agg.mastered}</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ic red"><span class="material-symbols-outlined">error</span></div>
+            <div><p class="lbl">Falladas históricas</p><p class="big">${agg.failed}</p></div>
+          </div>
+        </div>
+      </section>
       ${S().warnings.length && !warningsDismissed ? `
+      <section class="home-section">
         <div class="card warn-card" id="warn-card">
           <div class="card-head">
             <h2>Filas omitidas (${S().warnings.length})</h2>
@@ -253,38 +290,60 @@ function loadSource() {
           </div>
           <p class="muted small">Se cargaron las preguntas válidas. Estas filas se ignoraron:</p>
           <div class="error-list">${S().warnings.map((w) => `<div class="error-item">${esc(w)}</div>`).join("")}</div>
-        </div>` : ""}
-      ${sections}
-      <div class="card">
-        <h2>Cambiar cuestionario</h2>
-        <div class="dropzone compact" id="dropzone2">
-          <div>Arrastrá otro CSV acá o hacé clic para elegirlo</div>
         </div>
-        <input type="file" id="file2" accept=".csv,text/csv,text/plain" hidden>
-      </div>
+      </section>` : ""}
+      <section class="home-section">
+        <div class="home-head">
+          <div>
+            <h2 class="section-title">Nueva Práctica</h2>
+            <p class="muted small sub">Un cuestionario por cada CSV · elegí la cantidad y comenzá</p>
+          </div>
+        </div>
+        <div class="exam-grid">${examCards}</div>
+      </section>
+      ${qs.length ? `
+      <section class="home-section">
+        <div class="home-head">
+          <div>
+            <h2 class="section-title">Gestión de cuestionarios</h2>
+            <p class="muted small sub">Fechas de parcial, calendarios y progreso por CSV</p>
+          </div>
+        </div>
+        ${manageCards}
+      </section>` : ""}
+      <section class="home-section">
+        <div class="card">
+          <h2>Agregar cuestionario</h2>
+          <div class="dropzone compact" id="dropzone2">
+            <div>Arrastrá otro CSV acá o hacé clic para elegirlo — se suma como una tarjeta nueva</div>
+          </div>
+          <input type="file" id="file2" accept=".csv,text/csv,text/plain" hidden>
+        </div>
+      </section>
     `);
 
     bindUpload("dropzone2", "file2");
     qs.forEach((qq) => {
       const h = qq.hash;
       const sec = document.getElementById("sec-" + h);
-      if (!sec) return;
-      document.getElementById("btn-start-" + h).addEventListener("click", () => {
+      const startBtn = document.getElementById("btn-start-" + h);
+      if (startBtn) startBtn.addEventListener("click", () => {
         Quiz.selectQuestionnaire(h);
-        Quiz.setMode("today");
+        const modeSel = document.getElementById("sel-mode-" + h);
+        if (modeSel) Quiz.setMode(modeSel.value);
         Quiz.newSession();
         renderQuiz();
       });
-      document.getElementById("btn-start2-" + h).addEventListener("click", () => {
-        Quiz.selectQuestionnaire(h);
-        Quiz.newSession();
-        renderQuiz();
-      });
-      document.getElementById("sel-mode-" + h).addEventListener("change", (e) => { Quiz.setMode(e.target.value); renderHome(); });
-      document.getElementById("sel-size-" + h).addEventListener("change", (e) => Quiz.setSize(e.target.value));
-      document.getElementById("inp-points-" + h).addEventListener("change", (e) => { Quiz.setPoints(e.target.value); renderHome(); });
-      document.getElementById("inp-exam-" + h).addEventListener("change", (e) => { Quiz.setExamDateFor(h, e.target.value); renderHome(); });
-      document.getElementById("btn-reset-" + h).addEventListener("click", () => {
+      const modeSel = document.getElementById("sel-mode-" + h);
+      if (modeSel) modeSel.addEventListener("change", (e) => Quiz.setMode(e.target.value));
+      const sizeSel = document.getElementById("sel-size-" + h);
+      if (sizeSel) sizeSel.addEventListener("change", (e) => Quiz.setSize(e.target.value));
+      const pointsInp = document.getElementById("inp-points-" + h);
+      if (pointsInp) pointsInp.addEventListener("change", (e) => Quiz.setPoints(e.target.value));
+      const examInp = document.getElementById("inp-exam-" + h);
+      if (examInp) examInp.addEventListener("change", (e) => { Quiz.setExamDateFor(h, e.target.value); renderCalFor(h); });
+      const resetBtn = document.getElementById("btn-reset-" + h);
+      if (resetBtn) resetBtn.addEventListener("click", () => {
         if (confirm(`¿Reiniciar todo el progreso de "${qq.name}"?`)) {
           Quiz.resetProgressFor(h);
           renderHome();
@@ -297,28 +356,23 @@ function loadSource() {
         if (Quiz.tryResume()) renderQuiz();
         else { S().items = []; renderHome(); }
       });
-      const discardBtn = document.getElementById("btn-discard-" + h);
-      if (discardBtn) discardBtn.addEventListener("click", () => {
-        Quiz.selectQuestionnaire(h);
-        S().items = [];
-        S().results = null;
-        renderHome();
-      });
-      const prevBtn = sec.querySelector(".cal-prev");
-      if (prevBtn) prevBtn.addEventListener("click", () => {
-        calNow();
-        calMonth--;
-        if (calMonth < 0) { calMonth = 11; calYear--; }
-        renderAllCals();
-      });
-      const nextBtn = sec.querySelector(".cal-next");
-      if (nextBtn) nextBtn.addEventListener("click", () => {
-        calNow();
-        calMonth++;
-        if (calMonth > 11) { calMonth = 0; calYear++; }
-        renderAllCals();
-      });
-      renderCalFor(h);
+      if (sec) {
+        const prevBtn = sec.querySelector(".cal-prev");
+        if (prevBtn) prevBtn.addEventListener("click", () => {
+          calNow();
+          calMonth--;
+          if (calMonth < 0) { calMonth = 11; calYear--; }
+          renderAllCals();
+        });
+        const nextBtn = sec.querySelector(".cal-next");
+        if (nextBtn) nextBtn.addEventListener("click", () => {
+          calNow();
+          calMonth++;
+          if (calMonth > 11) { calMonth = 0; calYear++; }
+          renderAllCals();
+        });
+        renderCalFor(h);
+      }
     });
     const warnClose = document.getElementById("btn-warn-close");
     if (warnClose) warnClose.addEventListener("click", () => { warningsDismissed = true; renderHome(); });

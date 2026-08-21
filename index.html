@@ -3,29 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cuestionario Â· CSV con repeticiÃ³n espaciada</title>
-  <meta name="description" content="Cuestionario de opciÃ³n mÃºltiple desde CSV para GitHub Pages, con repeticiÃ³n espaciada y puntaje parcial con penalizaciÃ³n.">
-  <link rel="stylesheet" href="css/style.css">
+  <title>Cuestionario · Practice Exam Hub</title>
+  <meta name="description" content="Plataforma de práctica de exámenes con repetición espaciada, puntaje parcial y un cuestionario por cada CSV.">
+  <script>
+    (function () {
+      var t = "dark";
+      try { t = localStorage.getItem("quiz.theme") || "dark"; } catch (e) {}
+      document.documentElement.className = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
-      <h1>Cuestionario</h1>
-      <span id="quiz-name" class="muted small"></span>
+      <div class="brand">
+        <span class="material-symbols-outlined brand-ic">school</span>
+        <h1>Cuestionario</h1>
+        <span id="quiz-name" class="muted small"></span>
+      </div>
+      <button id="theme-toggle" class="theme-switch" type="button" aria-label="Cambiar tema">
+        <span class="material-symbols-outlined ic-sun">light_mode</span>
+        <span class="switch-track"><span class="switch-knob"></span></span>
+        <span class="material-symbols-outlined ic-moon">dark_mode</span>
+      </button>
     </div>
   </header>
 
   <main id="app" class="container"></main>
 
   <footer class="muted small">
-    Progreso y preferencias guardados localmente en tu navegador Â· las preguntas se guardan del Ãºltimo CSV que cargaste
+    Progreso y preferencias guardados localmente en tu navegador · un cuestionario por cada CSV en /data
   </footer>
 
-  <script src="js/storage.js?v=3"></script>
-  <script src="js/csv.js?v=3"></script>
-  <script src="js/scheduler.js?v=3"></script>
-  <script src="js/quiz.js?v=3"></script>
-  <script src="js/ui.js?v=3"></script>
+  <script src="js/storage.js?v=4"></script>
+  <script src="js/csv.js?v=4"></script>
+  <script src="js/scheduler.js?v=4"></script>
+  <script src="js/quiz.js?v=4"></script>
+  <script src="js/ui.js?v=4"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       window.UI.init();
