@@ -23,6 +23,141 @@
   const LETTERS = "ABCDEFGHIJ";
   const stat = (cls, num, lbl) => `<div class="stat"><div class="num ${cls}">${num}</div><div class="lbl">${lbl}</div></div>`;
 
+  const POMO_DEFAULT = { study: 25, short: 5, long: 15 };
+  let pomo = { phase: "study", remaining: POMO_DEFAULT.study * 60, running: false, doneCount: 0, timer: null };
+  let pomoCfg = { ...POMO_DEFAULT };
+
+  function pomoLoad() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("quiz.pomo") || "{}");
+      ["study", "short", "long"].forEach((k) => {
+        const v = parseInt(raw[k], 10);
+        if (v >= 1 && v <= 150) pomoCfg[k] = v;
+      });
+    } catch (e) {}
+  }
+  function pomoSave() {
+    try { localStorage.setItem("quiz.pomo", JSON.stringify(pomoCfg)); } catch (e) {}
+  }
+  const pomoDur = (ph) => (pomoCfg[ph === "study" ? "study" : ph] || POMO_DEFAULT[ph]) * 60;
+  const pomoLabel = () => ({ study: "Estudio", short: "Pausa", long: "Pausa larga" })[pomo.phase];
+
+  function pomoBeep() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      [0, 0.22, 0.44].forEach((t) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.18);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(ctx.currentTime + t);
+        o.stop(ctx.currentTime + t + 0.2);
+      });
+      setTimeout(() => { try { ctx.close(); } catch (e) {} }, 900);
+    } catch (e) {}
+  }
+
+  function pomoNextPhase() {
+    if (pomo.phase === "study") {
+      pomo.doneCount++;
+      return pomo.doneCount % 4 === 0 ? "long" : "short";
+    }
+    return "study";
+  }
+
+  function pomoRender() {
+    const box = document.getElementById("pomo");
+    const timeEl = document.getElementById("pomo-time");
+    const playEl = document.getElementById("pomo-play");
+    const dotsEl = document.getElementById("pomo-dots");
+    if (!box || !timeEl || !playEl || !dotsEl) return;
+    const m = Math.floor(pomo.remaining / 60);
+    const s = pomo.remaining % 60;
+    timeEl.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    timeEl.title = pomoLabel();
+    playEl.querySelector(".material-symbols-outlined").textContent = pomo.running ? "pause" : "play_arrow";
+    playEl.title = pomo.running ? "Pausar" : "Iniciar";
+    box.classList.toggle("running", pomo.running);
+    box.classList.toggle("break", pomo.phase !== "study");
+    box.classList.toggle("study", pomo.phase === "study");
+    let dots = "";
+    for (let i = 0; i < 4; i++) dots += `<span class="pomo-dot ${i < pomo.doneCount % 4 ? "done" : ""}"></span>`;
+    dotsEl.innerHTML = dots;
+  }
+
+  function pomoTick() {
+    pomo.remaining--;
+    if (pomo.remaining > 0) { pomoRender(); return; }
+    clearInterval(pomo.timer);
+    pomo.timer = null;
+    pomo.running = false;
+    pomo.remaining = pomoDur(pomo.phase);
+    pomo.phase = pomoNextPhase();
+    pomo.remaining = pomoDur(pomo.phase);
+    pomoBeep();
+    toast(`Pomodoro: ${pomoLabel()} — apretá play cuando estés listo`);
+    pomoRender();
+    document.getElementById("pomo").classList.add("done");
+  }
+
+  function initPomodoro() {
+    pomoLoad();
+    pomo.remaining = pomoDur("study");
+    const box = document.getElementById("pomo");
+    if (!box) return;
+    document.getElementById("pomo-play").addEventListener("click", () => {
+      box.classList.remove("done");
+      pomo.running = !pomo.running;
+      if (pomo.running) {
+        pomo.timer = setInterval(pomoTick, 1000);
+      } else if (pomo.timer) {
+        clearInterval(pomo.timer);
+        pomo.timer = null;
+      }
+      pomoRender();
+    });
+    document.getElementById("pomo-reset").addEventListener("click", () => {
+      if (pomo.timer) { clearInterval(pomo.timer); pomo.timer = null; }
+      pomo.running = false;
+      pomo.remaining = pomoDur(pomo.phase);
+      box.classList.remove("done");
+      pomoRender();
+    });
+    const panel = document.getElementById("pomo-panel");
+    document.getElementById("pomo-cfg").addEventListener("click", (e) => {
+      e.stopPropagation();
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) {
+        document.getElementById("pomo-study").value = pomoCfg.study;
+        document.getElementById("pomo-short").value = pomoCfg.short;
+        document.getElementById("pomo-long").value = pomoCfg.long;
+      }
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => { panel.hidden = true; });
+    [["pomo-study", "study"], ["pomo-short", "short"], ["pomo-long", "long"]].forEach(([id, key]) => {
+      document.getElementById(id).addEventListener("change", (e) => {
+        const v = parseInt(e.target.value, 10);
+        if (!(v >= 1 && v <= 150)) return;
+        pomoCfg[key] = v;
+        pomoSave();
+        if (!pomo.running) {
+          pomo.remaining = pomoDur(pomo.phase);
+          document.getElementById("pomo").classList.remove("done");
+          pomoRender();
+        }
+      });
+    });
+    pomoRender();
+  }
+
   function toast(msg) {
     let el = document.getElementById("toast");
     if (!el) {
@@ -82,6 +217,7 @@ function loadSource() {
       el.classList.toggle("light", !dark);
       try { localStorage.setItem("quiz.theme", dark ? "dark" : "light"); } catch (e) {}
     });
+    initPomodoro();
     loadSource().then((r) => {
       if (r.loaded) {
         warningsDismissed = false;

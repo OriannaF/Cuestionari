@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -25,6 +25,26 @@
         <span class="material-symbols-outlined brand-ic">school</span>
         <h1>Quizzori</h1>
         <span id="quiz-name" class="muted small"></span>
+      </div>
+      <div class="pomo" id="pomo">
+        <button class="pomo-btn" id="pomo-cfg" type="button" title="Configurar pomodoro">
+          <span class="material-symbols-outlined">timer</span>
+        </button>
+        <span class="pomo-time" id="pomo-time">25:00</span>
+        <span class="pomo-dots" id="pomo-dots" title="Pomodoros completados"></span>
+        <button class="pomo-btn pomo-play" id="pomo-play" type="button" title="Iniciar / Pausar">
+          <span class="material-symbols-outlined">play_arrow</span>
+        </button>
+        <button class="pomo-btn" id="pomo-reset" type="button" title="Reiniciar fase">
+          <span class="material-symbols-outlined">restart_alt</span>
+        </button>
+        <div class="pomo-panel" id="pomo-panel" hidden>
+          <div class="pomo-panel-title">Pomodoro</div>
+          <label>Estudio (min)<input type="number" id="pomo-study" min="1" max="120" value="25"></label>
+          <label>Pausa corta (min)<input type="number" id="pomo-short" min="1" max="60" value="5"></label>
+          <label>Pausa larga (min)<input type="number" id="pomo-long" min="1" max="90" value="15"></label>
+          <div class="muted small">Pausa larga cada 4 estudios.</div>
+        </div>
       </div>
       <button id="theme-toggle" class="theme-switch" type="button" aria-label="Cambiar tema">
         <span class="material-symbols-outlined ic-sun">light_mode</span>
@@ -40,11 +60,11 @@
     Progreso y preferencias guardados localmente en tu navegador · un cuestionario por cada CSV en /data
   </footer>
 
-  <script src="js/storage.js?v=5"></script>
-  <script src="js/csv.js?v=5"></script>
-  <script src="js/scheduler.js?v=5"></script>
-  <script src="js/quiz.js?v=5"></script>
-  <script src="js/ui.js?v=5"></script>
+  <script src="js/storage.js?v=6"></script>
+  <script src="js/csv.js?v=6"></script>
+  <script src="js/scheduler.js?v=6"></script>
+  <script src="js/quiz.js?v=6"></script>
+  <script src="js/ui.js?v=6"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       window.UI.init();
