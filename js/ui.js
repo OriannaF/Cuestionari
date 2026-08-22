@@ -296,7 +296,6 @@ function loadSource() {
         <div class="home-head">
           <div>
             <h2 class="section-title">Nueva Práctica</h2>
-            <p class="muted small sub">Un cuestionario por cada CSV · elegí la cantidad y comenzá</p>
           </div>
         </div>
         <div class="exam-grid">${examCards}</div>
