@@ -173,7 +173,6 @@ function loadSource() {
 
   function renderHome() {
     const qs = S().questionnaires;
-    document.getElementById("quiz-name").textContent = `${qs.length} cuestionario${qs.length === 1 ? "" : "s"} cargado${qs.length === 1 ? "" : "s"}`;
 
     const stats = qs.map((qq) => Quiz.statsFor(qq.hash)).filter(Boolean);
     const agg = { total: 0, today: 0, mastered: 0, failed: 0 };
