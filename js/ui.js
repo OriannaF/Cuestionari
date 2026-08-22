@@ -86,12 +86,6 @@ function loadSource() {
       if (r.loaded) {
         warningsDismissed = false;
         renderHome();
-        if (S().questionnaires.length > 1) {
-          const names = S().questionnaires.map(q => q.name).join(", ");
-          toast(`Cuestionarios cargados: ${S().questionnaires.length} (${names})`);
-        } else {
-          toast(`Cuestionario cargado: ${S().questions.length} preguntas`);
-        }
       } else if (r.errors) {
         renderLoadError(r.errors);
       } else {
