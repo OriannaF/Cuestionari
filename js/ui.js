@@ -515,6 +515,35 @@ function loadSource() {
     $("#pending-label").textContent = `${n - answered} sin responder`;
   }
 
+  const advanceTimers = {};
+
+  function scheduleAdvance(qid, delay) {
+    const items = S().items;
+    const idx = items.findIndex((it) => it.q.id === qid);
+    if (idx < 0 || idx >= items.length - 1) return;
+    let targetId = null;
+    for (let i = idx + 1; i < items.length; i++) {
+      if (!Quiz.isAnswered(items[i].q.id)) { targetId = items[i].q.id; break; }
+    }
+    if (!targetId) {
+      setTimeout(() => {
+        const btn = document.getElementById("btn-submit");
+        if (btn) btn.focus();
+      }, delay);
+      return;
+    }
+    clearTimeout(advanceTimers[targetId]);
+    advanceTimers[targetId] = setTimeout(() => {
+      const el = document.getElementById("qcard-" + targetId);
+      if (!el || !$("#btn-exit")) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("adv-target");
+      void el.offsetWidth;
+      el.classList.add("adv-target");
+      setTimeout(() => el.classList.remove("adv-target"), 900);
+    }, delay);
+  }
+
   function bindQuizEvents() {
     $("#btn-exit").addEventListener("click", () => {
       if (confirm("¿Salir de la sesión? Tus respuestas se guardan y podés continuar después.")) {
@@ -527,6 +556,7 @@ function loadSource() {
       input.addEventListener("change", (e) => {
         const qid = parseInt(e.target.dataset.q, 10);
         const disp = parseInt(e.target.dataset.d, 10);
+        const wasAnswered = Quiz.isAnswered(qid);
         Quiz.toggle(qid, disp);
         e.target.closest(".opt").classList.toggle("checked", e.target.checked);
         const card = document.getElementById("qcard-" + qid);
@@ -536,6 +566,7 @@ function loadSource() {
         if (answeredNow) card.removeAttribute("data-unanswered");
         else card.setAttribute("data-unanswered", "");
         updateQuizUI();
+        if (!wasAnswered && answeredNow) scheduleAdvance(qid, 500);
       });
     });
     document.querySelectorAll(".slot-select").forEach((sel) => {
@@ -543,6 +574,7 @@ function loadSource() {
         const qid = parseInt(e.target.dataset.q, 10);
         const slot = parseInt(e.target.dataset.slot, 10);
         const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+        const wasAnswered = Quiz.isAnswered(qid);
         Quiz.setSlot(qid, slot, val);
         const card = document.getElementById("qcard-" + qid);
         const answeredNow = Quiz.isAnswered(qid);
@@ -551,11 +583,13 @@ function loadSource() {
         if (answeredNow) card.removeAttribute("data-unanswered");
         else card.setAttribute("data-unanswered", "");
         updateQuizUI();
+        if (!wasAnswered && answeredNow) scheduleAdvance(qid, 400);
       });
     });
     document.querySelectorAll(".fill-input").forEach((inp) => {
       inp.addEventListener("input", (e) => {
         const qid = parseInt(e.target.dataset.q, 10);
+        const wasAnswered = Quiz.isAnswered(qid);
         Quiz.setFill(qid, e.target.value);
         const card = document.getElementById("qcard-" + qid);
         const answeredNow = Quiz.isAnswered(qid);
@@ -564,6 +598,23 @@ function loadSource() {
         if (answeredNow) card.removeAttribute("data-unanswered");
         else card.setAttribute("data-unanswered", "");
         updateQuizUI();
+        if (!wasAnswered && answeredNow) {
+          clearTimeout(advanceTimers["f" + qid]);
+          advanceTimers["f" + qid] = setTimeout(() => {
+            delete advanceTimers["f" + qid];
+            scheduleAdvance(qid, 0);
+          }, 1200);
+        }
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const qid = parseInt(e.target.dataset.q, 10);
+        if (advanceTimers["f" + qid]) {
+          clearTimeout(advanceTimers["f" + qid]);
+          delete advanceTimers["f" + qid];
+        }
+        if (Quiz.isAnswered(qid)) scheduleAdvance(qid, 0);
       });
     });
   }

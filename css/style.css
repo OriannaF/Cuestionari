@@ -695,3 +695,9 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 .toast-close:hover { color: var(--text); background: var(--panel); }
 
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
+
+.qcard.adv-target { animation: advPulse 0.9s ease; }
+@keyframes advPulse {
+  0% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: var(--shadow-hover); }
+}
