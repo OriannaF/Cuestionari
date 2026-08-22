@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <header class="topbar">
@@ -26,6 +26,10 @@
         <h1>Quizzori</h1>
         <span id="quiz-name" class="muted small"></span>
       </div>
+      <button id="cloud-btn" class="cloud-btn" type="button" title="Cuenta y sincronización">
+        <span class="material-symbols-outlined" id="cloud-ic">account_circle</span>
+        <span id="cloud-label">Entrar</span>
+      </button>
       <div class="pomo" id="pomo">
         <button class="pomo-btn" id="pomo-cfg" type="button" title="Configurar pomodoro">
           <span class="material-symbols-outlined">timer</span>
@@ -60,11 +64,12 @@
     Progreso y preferencias guardados localmente en tu navegador · un cuestionario por cada CSV en /data
   </footer>
 
-  <script src="js/storage.js?v=6"></script>
-  <script src="js/csv.js?v=6"></script>
-  <script src="js/scheduler.js?v=6"></script>
-  <script src="js/quiz.js?v=6"></script>
-  <script src="js/ui.js?v=6"></script>
+  <script src="js/storage.js?v=7"></script>
+  <script src="js/csv.js?v=7"></script>
+  <script src="js/scheduler.js?v=7"></script>
+  <script src="js/quiz.js?v=7"></script>
+  <script src="js/cloud.js?v=7"></script>
+  <script src="js/ui.js?v=7"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       window.UI.init();

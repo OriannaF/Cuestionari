@@ -209,6 +209,34 @@ function loadSource() {
     });
   }
 
+  function initCloudUI() {
+    const btn = document.getElementById("cloud-btn");
+    if (!btn) return;
+    const Cloud = window.Cloud;
+    const ic = document.getElementById("cloud-ic");
+    const label = document.getElementById("cloud-label");
+    const paint = () => {
+      const u = Cloud && Cloud.user();
+      if (ic) ic.textContent = u ? "cloud_done" : "account_circle";
+      if (label) label.textContent = u ? (u.name || "Cuenta") : "Entrar";
+      btn.title = u ? "Sincronizado · clic para cerrar sesión" : "Iniciar sesión y sincronizar progreso";
+    };
+    btn.addEventListener("click", () => {
+      if (!Cloud || !Cloud.isConfigured()) {
+        toast("Sync sin configurar: creá un proyecto gratis en Firebase y pegá las claves en js/cloud.js");
+        return;
+      }
+      if (Cloud.user()) {
+        if (confirm("¿Cerrar sesión en este dispositivo? Tu progreso queda guardado en la nube.")) Cloud.signOut().then(paint);
+        return;
+      }
+      toast("Abriendo Google…");
+      Cloud.signIn().then(() => { paint(); }).catch(() => toast("No se pudo iniciar sesión. Revisá tu conexión o la config de Firebase."));
+    });
+    if (Cloud) Cloud.onChange(paint);
+    paint();
+  }
+
   function init() {
     const tt = document.getElementById("theme-toggle");
     if (tt) tt.addEventListener("click", () => {
@@ -218,6 +246,7 @@ function loadSource() {
       try { localStorage.setItem("quiz.theme", dark ? "dark" : "light"); } catch (e) {}
     });
     initPomodoro();
+    initCloudUI();
     loadSource().then((r) => {
       if (r.loaded) {
         warningsDismissed = false;

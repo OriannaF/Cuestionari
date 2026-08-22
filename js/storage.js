@@ -25,11 +25,32 @@ const QuizStore = (() => {
       return v ? JSON.parse(v) : def;
     } catch (e) { return def; }
   };
+
+  const EXCLUDE_SYNC = ["quiz.theme", "quiz.pomo", "quiz.keytimes"];
+  const isSyncKey = (k) =>
+    String(k).indexOf("quiz.") === 0 &&
+    EXCLUDE_SYNC.indexOf(k) < 0 &&
+    String(k).indexOf("quiz.cloud.") !== 0;
+
+  let keytimes = get("quiz.keytimes", {});
+  const known = new Set();
+  const listeners = [];
+  const emit = () => listeners.forEach((fn) => { try { fn(); } catch (e) {} });
+
+  function touchKey(k) {
+    keytimes[k] = Date.now();
+    try { store.setItem("quiz.keytimes", JSON.stringify(keytimes)); } catch (e) {}
+  }
+
   const set = (k, v) => {
-    try { store.setItem(k, JSON.stringify(v)); } catch (e) { }
+    try {
+      store.setItem(k, JSON.stringify(v));
+      if (isSyncKey(k)) { known.add(k); touchKey(k); emit(); }
+    } catch (e) { }
   };
   const remove = (k) => {
     try { store.removeItem(k); } catch (e) { }
+    if (isSyncKey(k)) { known.add(k); touchKey(k); emit(); }
   };
 
   function loadProgress(h) { return get(PREFIX + h, {}); }
@@ -49,10 +70,38 @@ const QuizStore = (() => {
   function loadExamDates(h) { return get("quiz.examdates." + h, null); }
   function saveExamDates(h, d) { set("quiz.examdates." + h, d); }
 
+  function snapshot() {
+    const kv = {}, times = {};
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (isSyncKey(k)) known.add(k);
+      }
+    } catch (e) {}
+    known.forEach((k) => {
+      const v = get(k, undefined);
+      if (v !== undefined) { kv[k] = v; times[k] = keytimes[k] || 0; }
+    });
+    return { kv, times };
+  }
+
+  function restore(kv) {
+    Object.keys(kv || {}).forEach((k) => {
+      known.add(k);
+      set(k, kv[k]);
+    });
+    emit();
+  }
+
+  function onChange(fn) {
+    if (typeof fn === "function") listeners.push(fn);
+  }
+
   return {
     hash, loadProgress, saveProgress, resetProgress,
     loadSettings, saveSettings, loadDraft, saveDraft, clearDraft,
-    loadLastCsv, saveLastCsv, loadExamDates, saveExamDates
+    loadLastCsv, saveLastCsv, loadExamDates, saveExamDates,
+    snapshot, restore, onChange
   };
 })();
 
