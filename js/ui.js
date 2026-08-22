@@ -56,6 +56,7 @@ function loadSource() {
         .then((txt) => {
           if (!txt.trim()) return { ok: false, skipped: true };
           const res = Quiz.loadCsv(txt, name);
+          if (res.ok && S().warnings.length) S().warnings = [];
           return res.ok ? { ok: true } : { ok: false, errors: res.errors };
         })
         .catch(() => ({ ok: false, skipped: true }));
